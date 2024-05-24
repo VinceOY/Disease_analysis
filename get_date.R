@@ -6,41 +6,44 @@ source("tool_function/standard_function.R")
 library(stringr)
 #===============================================================================
 ## get disease code list
-folder_path2 = "C:/Users/USER/Downloads/proj/"
+folder_path2 = "C:/Users/USER/Downloads/TMUCRD_2021_csv/"
 dt1 <- fread(paste0(folder_path2, "ICD92ICD10.csv"))
 dt1 <- dt1[, c("ICD-9-CM代碼" ,"ICD-10-CM"),with = FALSE]
 setnames(dt1, "ICD-9-CM代碼", "ICD9")
 setnames(dt1, "ICD-10-CM", "ICD10")
-ICD9_diabetes = list(Eye_complications = c("362.01","362.02","362.55", "362.11",
-                                           "365.44","369","361","369.60"),
-                     Cardiovascular_disease = c("414.9","413.9","411.1","412",
-                                                "428","425","402"),
-                     Cerebrovascular_disease = c("435.9","434.91","432.9",
-                                                 "437.1"),
-                     Peripheral_vascular_disease = c("440.2","440.20","440.21",
-                                                     "440.22","440.23","440.24"),
-                     Nephropathy = c("583", "585", "V451"),
-                     Diabetic_neuropathy = c("357.2","337.1","353"),
+ICD9_codes = list(EyeComp = c("362.01","362.02","362.55", "362.11",
+                              "365.44","369","361","369.60"),
+                  CardioDisease = c("414.9","413.9","411.1","412",
+                                    "428","425","402"),
+                  CerebroDisease = c("435.9","434.91","432.9",
+                                     "437.1"),
+                  PeripheralVascDisease = c("440.2","440.20","440.21",
+                                            "440.22","440.23","440.24"),
+                  Nephropathy = c("583", "585", "V451"),
+                  DiabeticNeuro = c("357.2","337.1","353"),
+                  Hypertension = "401", PeripheralEnthe = "726",
+                  UnknownCauses = "799", LipoidMetabDis = "272", 
+                  AcuteURI = "465", AbdPelvicSymptoms = c("724","789"),
+                  Dermatophytosis = "110", GenSymptoms = "780",
+                  RespChestSymptoms = "786", HeadNeckSymptoms = "784",
+                  ContactDermEczema = "692", ViralInfection = "79",
+                  ObesityHyperal = "278", JointDisorders = "719",
+                  AcuteBronchitis = "466", SoftTissueDis = "729",
+                  BloodExamFindings = "790", RefractionDis = "367",
+                  ConjunctivaDis = "372"
 )
 
 disease_code_list = list()
-for (a in names(ICD9_diabetes)) {
-  d_tmp <-  dt1[grepl(paste0("^", paste(ICD9_diabetes[[a]], 
-                                        collapse="|^")), ICD9)]
-  disease_code_list[[a]] <- c(d_tmp$ICD9,d_tmp$ICD10)
+for (a in names(ICD9_codes)) {
+  d_tmp <-  dt1[grepl(paste0("^", paste(ICD9_codes[[a]],collapse="|^")), ICD9)]
+  d_tmp[,disease_name := a]
+  disease_code_list[[a]] <- c(unique(d_tmp$ICD9),unique(d_tmp$ICD10))
 }
-
-# control disease code transfer
-control_disease <- c("401","726","799","272","465","724","789","110","780","786",
-                     "784","692","79","278","719","466","729","790","367","372")
-
-control_df <- dt1[grepl(paste0("^", paste(control_disease, 
-                                             collapse="|^")), ICD9)]
-#=== output
-
-disease_code_list[["Diabete"]] <- c("E08","E09","E10","E11","E12")
-disease_code_list[["Contorl_disease"]] <- c(control_df$ICD9,control_df$ICD10)
-
+ICD10_codes_diabete = c("E08","E09","E10","E11","E12")
+d_tmp <- dt1[grepl(paste0("^", paste(ICD10_codes_diabete, 
+                                     collapse="|^")), ICD10)]                              
+d_tmp[,disease_name := "diabete"]
+disease_code_list[["diabete"]] <- c(unique(d_tmp$ICD9), unique(d_tmp$ICD10))
 #===============================================================================
 ## get data
 parameters <- list(
@@ -57,8 +60,7 @@ parameters <- list(
                           "ICD10_CODE1", "ICD10_CODE2", "ICD10_CODE3", 
                           "ICD10_CODE4", "ICD10_CODE5"),
       id_col = "CHR_NO",
-      date_col = "OPD_DATE",
-      k = 3
+      date_col = "OPD_DATE"
     ),
     ipd = list(
       # dt2 parameters
@@ -68,13 +70,11 @@ parameters <- list(
                           "ICD10_CODE4", "ICD10_CODE5", "ICD10_CODE6", 
                           "ICD10_CODE7"),
       id_col = "CHR_NO",
-      date_col = "IPD_DATE",
-      k = 1
+      date_col = "IPD_DATE"
     )
   )
 )
 
-P_list = list()
 folder_path <- parameters$folder_path
 disease_codes <- parameters$disease_codes
 
@@ -87,14 +87,167 @@ for (data_set_name in names(parameters$data_sets)) {
   dt_disease_ID_cols <- data_set$disease_ID_cols
   
   for (file in dt_file_list) {
+    hospital_names <- sub(".*_(.*)\\.csv", "\\1", file)
     d_tmp <- fread(paste0(folder_path, file))
     merge_df <- fetch_data2(d_tmp, dt_target_ID_cols, dt_disease_ID_cols, 
                             disease_codes)
     for (name in names(merge_df)) {
-      csv_file_name <- paste0("C:/Users/USER/Downloads/proj/disease_df/",
-                              data_set_name,"_", name, ".csv")
-      fwrite(merge_df, file = csv_file_name, row.names = FALSE)
+      csv_file_name <- paste0("C:/Users/USER/Downloads/disease_df/", name, "_",
+                              data_set_name, "_", hospital_names, ".csv")
+      fwrite(merge_df[[name]], file = csv_file_name, row.names = FALSE)
+      print(csv_file_name)
     }
   }
 }
+
+#===============================================================================
+# tb1_diabete: ID, Index_date 
+# data source: opd/ipd_3院_diabete檔案6個
+# step1: rbind 成 opd / ipd 2 files 
+# step2: 標準化日期
+# step3: append p_list
+# step4: find_earliest_date(P_list)
+# output: tb_diabete[ID, Index_date]
+directory_path <- "C:/Users/USER/Downloads/disease_df/"
+
+Diabete_groups <- c("Diabete_ipd", "Diabete_opd")
+Diabete_list <- list()
+for (d in Diabete_groups) {
+  Diabete_files <- list.files(directory_path, pattern = d, full.names = TRUE, 
+                               ignore.case = TRUE)
+  dt_diabete <- data.table()
+  for (file in Diabete_files) {
+    d_tmp <- fread(file)
+    d_tmp <- standardized_date(d_tmp, names(d_tmp)[2])
+    if(nrow(dt_diabete)==0){
+      dt_diabete <- d_tmp
+    }else{
+      dt_diabete <- rbind(dt_diabete, d_tmp)
+    }
+    Diabete_list[[d]] <- dt_diabete
+  }
+}
+
+P_list = list(list(df = Diabete_list$Diabete_ipd, idcol = "CHR_NO", 
+                   datecol = "IPD_DATE", k = 1),
+              list(df = Diabete_list$Diabete_opd, idcol = "CHR_NO", 
+                   datecol = "OPD_DATE", k = 3))
+tb1_diabete <- find_earliest_date(P_list)
+setnames(tb1_diabete, "Date", "Index_date")
+
+#===============================================================================
+# complication_list: [tb1,tb2,tb3,...]
+# tb_complication = [ID, ("疾病","DATE")]
+# data source: opd/ipd_3院_complication檔案: 2*3*6 = 36個
+# step1: rename("OPD_DATE", ("疾病","DATE") )
+# step2: rename("IPD_DATE", ("疾病","DATE") )
+# step3: 標準化日期
+# step4: rbind成疾病檔
+# step5: rename("CHR_NO","ID")
+# output: 6個疾病table list
+complication_groups <- c("EyeComp", "CardioDisease", "CerebroDisease", 
+                         "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro")
+complication_list <- list()
+for (c in complication_groups) {
+  complication <- c
+  complication_files <- list.files(directory_path, pattern = c, 
+                                   full.names = TRUE, ignore.case = TRUE)
+  dt_c <- data.table()
+  for (file in complication_files) {
+    d_tmp <- fread(file)
+    d_tmp <- standardized_date(d_tmp, names(d_tmp)[2])
+    setnames(d_tmp, names(d_tmp)[2], paste0(complication,"_DATE") )
+    dt_c <- rbind(dt_c, d_tmp)
+  }
+  
+  setnames(dt_c,names(dt_c)[1], "ID")
+  complication_list[[complication]] <- dt_c
+}
+complication_list$EyeComp
+
+
+#===============================================================================
+# data source:  病人資料_CHR_basic
+# step1: 三院資料合併
+# step2: select columns("CHR_NO","SEX_TYPE","BIRTH_DATE","DEATH_DATE")
+# step3: drop duplicate by "CHR_NO", rename("CHR_NO", "ID")
+# step4: 對"BIRTH_DATE","DEATH_DATE" 轉str, 補0, 標準化
+# output: dt_basic[ID, SEX_TYPE,"BIRTH_DATE", "DEATH_DATE"]
+
+basic_files <- c("v_chr_basic_w.csv","v_chr_basic_t.csv","v_chr_basic_s.csv")
+d_basic <- data.table()
+for (file in basic_files) {
+  d_tmp <- fread(paste0(folder_path, file))
+  d_basic <- rbind(d_basic, d_tmp)
+}
+d_basic <- d_basic[,c("CHR_NO","SEX_TYPE","BIRTH_DATE","DEATH_DATE"),
+                   with = FALSE]
+d_basic <- d_basic[!duplicated(d_basic, by = c("CHR_NO"))] # 移除任何重複
+setnames(d_basic, "CHR_NO", "ID")
+cols_to_pad <- c("BIRTH_DATE", "DEATH_DATE")
+d_basic[, (cols_to_pad) := lapply(.SD, function(x) 
+  str_pad(x, width = 7, side = "left", pad = "0")), .SDcols = cols_to_pad]
+d_basic <- standardized_date(d_basic, "BIRTH_DATE") 
+d_basic <- standardized_date(d_basic, "DEATH_DATE") 
+
+# Merge tables
+# step1: merge basic, first date: exclude: 
+# step1.1: cal age / sep age group 
+dt_merge <- merge(d_basic, tb1_diabete, by = "ID", all = FALSE) 
+
+# cal age / sep age group 
+dt_merge[, AGE := as.numeric(difftime(Index_date, BIRTH_DATE, 
+                                      units = "days")) / 365.25]
+dt_merge[, AGE_GROUP := cut(AGE, breaks = seq(0, 120, by = 10), right = FALSE, 
+                            labels = paste(seq(0, 110, by = 10), 
+                                           seq(10, 120, by = 10), sep = "-"))]
+
+# step2: merge basic, first date, Outcomes
+# step2.1: create event col 
+# step2.2: cal end date 
+# step2.3: fill Death date col => fill 疾病_date col
+# step2.4: add follow up date col => leave data with follow up date col > 365
+complication_list
+
+for (d in names(complication_list)) {
+  outcome <- complication_list[[d]]
+  dt_merge <- merge(dt_merge, outcome, by = "ID", all = FALSE)
+  dt_merge[, event := ifelse(is.na(Date), 0, 1)] # add event column
+  setnames(dt_merge, event, paset0(d,"_event"))
+  # Todo
+  end_date <- max(dt_merge$Date, na.rm = TRUE)
+  # fill Death date col
+  dt_merge2[is.na(DEATH_DATE), DEATH_DATE := end_date]
+  
+
+}
+
+dt_merge2 <- merge(dt_merge, tb2, by = "ID", all = FALSE) # all = FALSE只保留兩邊都有的
+dt_merge2 <- dt_merge2[,c("ID","SEX_TYPE","AGE","age_group","BIRTH_DATE",
+                          "DEATH_DATE", "Index_date", "Date")]
+
+
+dt_merge2[, event := ifelse(is.na(Date), 0, 1)] # add event column
+
+end_date <- max(dt_merge2$Date, na.rm = TRUE)
+
+# fill Death date col
+dt_merge2[is.na(DEATH_DATE), DEATH_DATE := end_date]
+
+# fill date col
+dt_merge2[is.na(Date), Date:= pmin(DEATH_DATE, end_date)]
+
+na_rows <- dt_merge2[is.na(Date)]
+
+# drop date - index_date < 365
+dt_merge2[, observe := Date - Index_date] # add event column
+dt_f <- dt_merge2[observe > 365]
+
+# data summary
+summary(dt_f)
+
+#Todo:
+#dt_merge2 修改
+
+
 
