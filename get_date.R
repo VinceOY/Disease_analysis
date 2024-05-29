@@ -45,16 +45,17 @@ d_tmp <- dt1[grepl(paste0("^", paste(ICD10_codes_diabete,
                                      collapse="|^")), ICD10)]
 d_tmp[,disease_name := "diabete"]
 disease_code_list[["diabete"]] <- c(unique(d_tmp$ICD9), unique(d_tmp$ICD10))
+ICD9_codes_Stroke = c("430","431","432","433","434","435","436")
+ICD10_codes_Stroke = c("I60","I61","I62","I63","I64","I65","I66","I67","I68",
+                       "I69")
+disease_code_list[["Stroke"]] <- c(ICD9_codes_Stroke, ICD10_codes_Stroke)
 
-#my_data_frame <- data.frame(disease_code_list$DiabeticNeuro)
-#fwrite(my_data_frame, 
-#       "C:/Users/USER/Downloads/disease_df/ICD_code.csv", row.names = FALSE)
 #===============================================================================
 ## get data
 parameters <- list(
   ori_folder_path = "C:/Users/USER/Downloads/TMUCRD_2021_csv/",
   target_folder_path = "C:/Users/USER/Downloads/disease_df/",
-  target_disease = "Diabete_",
+  target_disease = "Diabete",
   related_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
                         "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro",
                         "Hypertension","PeripheralEnthe","UnknownCauses",
@@ -118,37 +119,6 @@ for (data_set_name in names(parameters$data_sets)) {
 }
 
 #===============================================================================
-# dt_target: ID, Index_date 
-# data source: opd/ipd_3院_diabete檔案6個
-target_list <- list()
-P_list <- list()
-
-for (data_set_name in names(parameters$data_sets)) {
-  dt_id_col <- parameters$data_sets[[data_set_name]]$id_col
-  dt_date_col <- parameters$data_sets[[data_set_name]]$date_col
-  dt_valid_times <- parameters$data_sets[[data_set_name]]$k
-  target_files = list.files(target_folder_path, 
-                            pattern = paste0(target_disease,data_set_name), 
-                            full.names = TRUE, ignore.case = TRUE)
-  dt_target <- data.table()
-  for (file in target_files) {
-    d_tmp <- fread(file)
-    d_tmp <- standardized_date(d_tmp, dt_date_col)
-    if(nrow(dt_target)==0){
-      dt_target <- d_tmp
-    }else{
-      dt_target <- rbind(dt_target, d_tmp)
-    }
-    target_list[[data_set_name]] <- dt_target
-    P_list <- append(P_list, list(list(df = target_list[[data_set_name]], 
-                                       idcol = dt_id_col, datecol = dt_date_col, 
-                                       k = dt_valid_times)))
-  }
-}
-dt_target <- find_earliest_date(P_list)
-setnames(dt_target , "Date", "Index_date")
-
-#===============================================================================
 # dt_basic: ["ID", "SEX_TYPE", "BIRTH_DATE", "DEATH_DATE" ]
 # data source:  病人資料_CHR_basic
 basic_files <- c("v_chr_basic_w.csv","v_chr_basic_t.csv","v_chr_basic_s.csv")
@@ -161,31 +131,49 @@ dt_basic <- dt_basic[, c("CHR_NO","SEX_TYPE","BIRTH_DATE","DEATH_DATE"),
                      with = FALSE]
 dt_basic[, unknown_ID := ifelse(.N > 1, 1, 0), by = CHR_NO]
 cols_to_pad <- c("BIRTH_DATE", "DEATH_DATE")
-dt_basic <- standardized_date(dt_basic, "BIRTH_DATE") 
+dt_basic <- standardized_date(dt_basic, "BIRTH_DATE")
 dt_basic <- standardized_date(dt_basic, "DEATH_DATE") 
 setnames(dt_basic, "CHR_NO", "ID")
 
 #===============================================================================
 # disease_list: [tb1,tb2,tb3,...]
-# tb_disease = [ID, ("疾病","DATE")]
+# tb_disease = [ID, DATE]
 disease_list <- list()
-for (d in related_diseases) {
+total_diseases <- c(target_disease, related_diseases)
+for (d in total_diseases) {
   disease <- d
-  disease_files <- list.files(target_folder_path, pattern = d, 
-                              full.names = TRUE, ignore.case = TRUE)
-  dt_c <- data.table()
-  for (file in disease_files) {
-    d_tmp <- fread(file)
-    if(nrow(d_tmp)!=0){
-      dt_date_col <- names(d_tmp)[2]
-      d_tmp <- standardized_date(d_tmp, names(d_tmp)[2])
-      setnames(d_tmp, dt_date_col, "DATE")
-      dt_c <- rbind(dt_c, d_tmp)
+  disease_tmp_list <- list()
+  P_tmp_list <- list()
+  for (data_set_name in names(parameters$data_sets)) {
+    disease_files <- list.files(target_folder_path, 
+                                pattern = paste0(d,"_",data_set_name), 
+                                full.names = TRUE, ignore.case = TRUE)
+    dt_id_col <- parameters$data_sets[[data_set_name]]$id_col
+    dt_date_col <- parameters$data_sets[[data_set_name]]$date_col
+    dt_valid_times <- parameters$data_sets[[data_set_name]]$k
+    dt_disease_tmp <- data.table()
+    for (file in disease_files) {
+      d_tmp <- fread(file)
+      if(nrow(d_tmp)!=0){
+        d_tmp <- standardized_date(d_tmp, dt_date_col)
+        if(nrow(dt_target)==0){
+          dt_disease_tmp <- d_tmp
+        }else{
+          dt_disease_tmp <- rbind(dt_disease_tmp, d_tmp)
+        }
+        disease_tmp_list[[data_set_name]] <- dt_disease_tmp
+        P_tmp_list <- append(P_tmp_list, list(list(df = disease_tmp_list[[data_set_name]], 
+                                                   idcol = dt_id_col, datecol = dt_date_col, 
+                                                   k = dt_valid_times)))
+      }
     }
   }
-  setnames(dt_c,"CHR_NO", "ID")
-  disease_list[[disease]] <- dt_c
+  dt_disease_tmp <- find_earliest_date(P_tmp_list)
+  disease_list[[disease]] <- dt_disease_tmp
 }
+
+dt_target <- disease_list$Diabete
+setnames(dt_target , "Date", "Index_date")
 
 #===============================================================================
 # Merge tables
@@ -198,47 +186,40 @@ dt_merge[, AGE_GROUP := cut(AGE, breaks = seq(0, 120, by = 10), right = FALSE,
                                            seq(10, 120, by = 10), sep = "-"))]
 
 #===============================================================================
-# step2: merge basic, first date, Outcomes
-dt_f <- data.table()
-for (d in names(disease_list)) {
+# merge basic, first date, Outcomes  
+for (d in related_diseases) {
   outcome <- disease_list[[d]]
-  d_tmp <- merge(dt_merge, outcome , by = "ID", all.x = TRUE,
-                 allow.cartesian=TRUE)
-  d_tmp[, event := ifelse(is.na(DATE), 0, 1)] 
-  d_tmp[, followup := DATE - Index_date]
-  setnames(d_tmp, "event", paste0(d,"_event"))
-  setnames(d_tmp, "DATE", paste0(d,"_DATE"))
-  setnames(d_tmp, "followup", paste0(d,"_followup"))
-  if(nrow(dt_f)==0){
-    dt_f <- d_tmp
-  }else{
-    dt_f <- rbind(dt_f, d_tmp, fill = TRUE)
-  }
+  dt_merge <- merge(dt_merge, outcome , by = "ID", all.x = TRUE)
+  dt_merge[, event := ifelse(is.na(Date), 0, 1)]
+  setnames(dt_merge, "event", paste0(d,"_event"))
+  setnames(dt_merge, "Date", paste0(d,"_Date"))
 }
-head(dt_f)
 
-summary(dt_f)
+# fill NA
+dt_merge[ ,end_date := DEATH_DATE]
+date_cols <- names(dt_merge)[sapply(dt_merge, is.date)]
+max_dates <- lapply(dt_merge[, ..date_cols], max, na.rm = TRUE)
+last_date <- do.call(max, c(max_dates, na.rm = TRUE))
+dt_merge[, end_date := ifelse(is.na(end_date), last_date, end_date)]
+dt_merge[, end_date := as.Date(end_date, origin = "1970-01-01")]
+
+for (d in related_diseases) {
+  y <- paste0(d, "_Date")
+  y2 <- paste0(d,"_event")
+  dt_merge[, (y) := ifelse(get(y2)==1, get(y), end_date)]
+  dt_merge[, (y) := as.Date(get(y), origin = "1970-01-01")]
+  dt_merge[, followup := get(y) - Index_date]
+  setnames(dt_merge, "followup", paste0(d,"_followup"))
+}
+
+dim(dt_merge)
+length(unique(dt_merge$ID))
+
+
 csv_file_name <- "C:/Users/USER/Downloads/disease_df/dt_f.csv"
-fwrite(dt_f, file = csv_file_name, row.names = FALSE)
-dim(dt_f)
-length(unique(dt_f$ID))
-names(dt_f)
+fwrite(dt_merge, file = csv_file_name, row.names = FALSE)
 
-#===============================================================================
-# todo
-# cal end date 
-# fill Death date col => fill 疾病_date col
-# add follow up date col => leave data with follow up date col > 365
-# fill na date
-end_date <- max(d_tmp$DATE, na.rm = TRUE)
-d_tmp[is.na(DEATH_DATE), DEATH_DATE := end_date]
-d_tmp[is.na(DATE), DATE:= pmin(DEATH_DATE, end_date)]
 
-# drop date - index_date < 365
-d_tmp[, followup := DATE - Index_date] # add event column
-d_tmp <- d_tmp[followup > 365]
-setnames(d_tmp, "followup", paste0(d,"_followup"))
 
-# data summary
-earliest_values <- tb1_target[order(Index_date)][1:21]
-table(tb1_target$Index_date)
+
+
