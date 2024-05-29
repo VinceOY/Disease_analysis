@@ -134,7 +134,7 @@ cols_to_pad <- c("BIRTH_DATE", "DEATH_DATE")
 dt_basic <- standardized_date(dt_basic, "BIRTH_DATE")
 dt_basic <- standardized_date(dt_basic, "DEATH_DATE") 
 setnames(dt_basic, "CHR_NO", "ID")
-
+dt_basic[ID==unique(dt_basic[unknown_ID==1]$ID)[1]]
 #===============================================================================
 # disease_list: [tb1,tb2,tb3,...]
 # tb_disease = [ID, DATE]
@@ -156,7 +156,7 @@ for (d in total_diseases) {
       d_tmp <- fread(file)
       if(nrow(d_tmp)!=0){
         d_tmp <- standardized_date(d_tmp, dt_date_col)
-        if(nrow(dt_target)==0){
+        if(nrow(dt_disease_tmp)==0){
           dt_disease_tmp <- d_tmp
         }else{
           dt_disease_tmp <- rbind(dt_disease_tmp, d_tmp)
@@ -211,10 +211,8 @@ for (d in related_diseases) {
   dt_merge[, followup := get(y) - Index_date]
   setnames(dt_merge, "followup", paste0(d,"_followup"))
 }
-
-dim(dt_merge)
-length(unique(dt_merge$ID))
-
+print(paste0("# of patients: ", length(unique(dt_merge$ID))))
+dt_merge[is.na(DEATH_DATE)]
 
 csv_file_name <- "C:/Users/USER/Downloads/disease_df/dt_f.csv"
 fwrite(dt_merge, file = csv_file_name, row.names = FALSE)
