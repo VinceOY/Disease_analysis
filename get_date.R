@@ -35,53 +35,65 @@ ICD9_codes = list(EyeComp = c("362.01","362.02","362.55", "362.11",
 
 disease_code_list = list()
 for (a in names(ICD9_codes)) {
-  d_tmp <-  dt1[grepl(paste0("^", paste(ICD9_codes[[a]],collapse="|^")), ICD9)]
+  d_tmp <- dt1[grepl(paste0("^", paste(ICD9_codes[[a]], collapse="|^")), ICD9)]
   d_tmp[,disease_name := a]
   disease_code_list[[a]] <- c(unique(d_tmp$ICD9),unique(d_tmp$ICD10))
 }
 
 ICD10_codes_diabete = c("E08","E09","E10","E11","E12")
 d_tmp <- dt1[grepl(paste0("^", paste(ICD10_codes_diabete, 
-                                     collapse="|^")), ICD10)]                              
+                                     collapse="|^")), ICD10)]
 d_tmp[,disease_name := "diabete"]
 disease_code_list[["diabete"]] <- c(unique(d_tmp$ICD9), unique(d_tmp$ICD10))
 
-my_data_frame <- data.frame(disease_code_list$DiabeticNeuro)
-fwrite(my_data_frame, 
-       "C:/Users/USER/Downloads/disease_df/ICD_code.csv", row.names = FALSE)
+#my_data_frame <- data.frame(disease_code_list$DiabeticNeuro)
+#fwrite(my_data_frame, 
+#       "C:/Users/USER/Downloads/disease_df/ICD_code.csv", row.names = FALSE)
 #===============================================================================
 ## get data
 parameters <- list(
-  # files
-  folder_path = "C:/Users/USER/Downloads/hospital/TMUCRD_2021_csv_new/",
+  ori_folder_path = "C:/Users/USER/Downloads/TMUCRD_2021_csv/",
+  target_folder_path = "C:/Users/USER/Downloads/disease_df/",
+  target_disease = "Diabete_",
+  related_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
+                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro",
+                        "Hypertension","PeripheralEnthe","UnknownCauses",
+                        "LipoidMetabDis","AcuteURI","AbdPelvicSymptoms",
+                        "Dermatophytosis","GenSymptoms","RespChestSymptoms",
+                        "HeadNeckSymptoms","ContactDermEczema","ViralInfection",
+                        "ObesityHyperal", "JointDisorders", "AcuteBronchitis", 
+                        "SoftTissueDis", "BloodExamFindings", "RefractionDis",
+                        "ConjunctivaDis"),
   disease_codes = disease_code_list,
-  # data sets parameters
   data_sets = list(
     opd = list(
-      # dt1 parameters
       file_list = c("v_opd_basic_w.csv","v_opd_basic_t.csv",
                     "v_opd_basic_s.csv"),
       disease_ID_cols = c("ICD9_CODE1", "ICD9_CODE2", "ICD9_CODE3", 
                           "ICD10_CODE1", "ICD10_CODE2", "ICD10_CODE3", 
                           "ICD10_CODE4", "ICD10_CODE5"),
       id_col = "CHR_NO",
-      date_col = "OPD_DATE"
+      date_col = "OPD_DATE",
+      k = 3
     ),
     ipd = list(
-      # dt2 parameters
       file_list = c("v_ipd_basic_w.csv","v_ipd_basic_t.csv",
                     "v_ipd_basic_s.csv"),
       disease_ID_cols = c("ICD10_CODE1", "ICD10_CODE2", "ICD10_CODE3", 
                           "ICD10_CODE4", "ICD10_CODE5", "ICD10_CODE6", 
                           "ICD10_CODE7"),
       id_col = "CHR_NO",
-      date_col = "IPD_DATE"
+      date_col = "IPD_DATE",
+      k = 1
     )
   )
 )
 
-folder_path <- parameters$folder_path
+folder_path <- parameters$ori_folder_path
+target_folder_path <- parameters$target_folder_path
 disease_codes <- parameters$disease_codes
+related_diseases <- parameters$related_diseases
+target_disease <- parameters$target_disease
 
 for (data_set_name in names(parameters$data_sets)) {
   data_set <- parameters$data_sets[[data_set_name]]
@@ -97,7 +109,7 @@ for (data_set_name in names(parameters$data_sets)) {
     merge_df <- fetch_data2(d_tmp, dt_target_ID_cols, dt_disease_ID_cols, 
                             disease_codes)
     for (name in names(merge_df)) {
-      csv_file_name <- paste0("C:/Users/USER/Downloads/disease_df/", name, "_",
+      csv_file_name <- paste0(target_folder_path, name, "_",
                               data_set_name, "_", hospital_names, ".csv")
       fwrite(merge_df[[name]], file = csv_file_name, row.names = FALSE)
       print(csv_file_name)
@@ -106,37 +118,17 @@ for (data_set_name in names(parameters$data_sets)) {
 }
 
 #===============================================================================
-# tb1_diabete: ID, Index_date 
+# dt_target: ID, Index_date 
 # data source: opd/ipd_3院_diabete檔案6個
-# step1: rbind 成 opd / ipd 2 files 
-# step2: 標準化日期
-# step3: append p_list
-# step4: find_earliest_date(P_list)
-# output: tb_diabete[ID, Index_date]
-parameters <- list(
-  disease_folder_path = "C:/Users/USER/Downloads/disease_df/",
-  data_sets = list(
-    Diabete_opd = list(
-      id_col = "CHR_NO",
-      date_col = "OPD_DATE",
-      k = 3
-    ),
-    Diabete_ipd = list(
-      id_col = "CHR_NO",
-      date_col = "IPD_DATE",
-      k = 1
-    )
-  )
-)  
-
-disease_folder_path <- parameters$disease_folder_path
 target_list <- list()
 P_list <- list()
+
 for (data_set_name in names(parameters$data_sets)) {
   dt_id_col <- parameters$data_sets[[data_set_name]]$id_col
   dt_date_col <- parameters$data_sets[[data_set_name]]$date_col
   dt_valid_times <- parameters$data_sets[[data_set_name]]$k
-  target_files = list.files(disease_folder_path, pattern = data_set_name, 
+  target_files = list.files(target_folder_path, 
+                            pattern = paste0(target_disease,data_set_name), 
                             full.names = TRUE, ignore.case = TRUE)
   dt_target <- data.table()
   for (file in target_files) {
@@ -157,13 +149,8 @@ dt_target <- find_earliest_date(P_list)
 setnames(dt_target , "Date", "Index_date")
 
 #===============================================================================
+# dt_basic: ["ID", "SEX_TYPE", "BIRTH_DATE", "DEATH_DATE" ]
 # data source:  病人資料_CHR_basic
-# step1: 三院資料合併
-# step2: select columns("CHR_NO","SEX_TYPE","BIRTH_DATE","DEATH_DATE")
-# step3: drop duplicate by "CHR_NO", rename("CHR_NO", "ID")
-# step4: 對"BIRTH_DATE","DEATH_DATE" 轉str, 補0, 標準化
-# output: dt_basic[ID, SEX_TYPE,"BIRTH_DATE", "DEATH_DATE"]
-folder_path <- "C:/Users/USER/Downloads/TMUCRD_2021_csv/"
 basic_files <- c("v_chr_basic_w.csv","v_chr_basic_t.csv","v_chr_basic_s.csv")
 dt_basic <- data.table()
 for (file in basic_files) {
@@ -171,7 +158,7 @@ for (file in basic_files) {
   dt_basic <- rbind(dt_basic, d_tmp)
 }
 dt_basic <- dt_basic[, c("CHR_NO","SEX_TYPE","BIRTH_DATE","DEATH_DATE"),
-                   with = FALSE]
+                     with = FALSE]
 dt_basic[, unknown_ID := ifelse(.N > 1, 1, 0), by = CHR_NO]
 cols_to_pad <- c("BIRTH_DATE", "DEATH_DATE")
 dt_basic <- standardized_date(dt_basic, "BIRTH_DATE") 
@@ -181,26 +168,10 @@ setnames(dt_basic, "CHR_NO", "ID")
 #===============================================================================
 # disease_list: [tb1,tb2,tb3,...]
 # tb_disease = [ID, ("疾病","DATE")]
-# data source: opd/ipd_3院_complication檔案: 2*3*6 = 36個
-# step1: rename("OPD_DATE", ("疾病","DATE") )
-# step2: rename("IPD_DATE", ("疾病","DATE") )
-# step3: 標準化日期
-# step4: rbind成疾病檔
-# step5: rename("CHR_NO","ID")
-# output: total 疾病table list
-disease_groups <- c("EyeComp", "CardioDisease", "CerebroDisease", 
-                    "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro",
-                    "Hypertension","PeripheralEnthe","UnknownCauses",
-                    "LipoidMetabDis","AcuteURI","AbdPelvicSymptoms",
-                    "Dermatophytosis","GenSymptoms","RespChestSymptoms",
-                    "HeadNeckSymptoms","ContactDermEczema","ViralInfection",
-                    "ObesityHyperal", "JointDisorders", "AcuteBronchitis", 
-                    "SoftTissueDis", "BloodExamFindings", "RefractionDis",
-                    "ConjunctivaDis")
 disease_list <- list()
-for (d in disease_groups) {
+for (d in related_diseases) {
   disease <- d
-  disease_files <- list.files(disease_folder_path, pattern = d, 
+  disease_files <- list.files(target_folder_path, pattern = d, 
                               full.names = TRUE, ignore.case = TRUE)
   dt_c <- data.table()
   for (file in disease_files) {
@@ -219,7 +190,7 @@ for (d in disease_groups) {
 #===============================================================================
 # Merge tables
 # step1: merge basic, index_date by CHR_NO and cal age / sep age group 
-dt_merge <- merge(dt_basic, tb1_target, by = "ID", all = FALSE) 
+dt_merge <- merge(dt_basic, dt_target, by = "ID", all = FALSE) 
 dt_merge[, AGE := as.numeric(difftime(Index_date, BIRTH_DATE, 
                                       units = "days")) / 365.25]
 dt_merge[, AGE_GROUP := cut(AGE, breaks = seq(0, 120, by = 10), right = FALSE, 
@@ -228,15 +199,11 @@ dt_merge[, AGE_GROUP := cut(AGE, breaks = seq(0, 120, by = 10), right = FALSE,
 
 #===============================================================================
 # step2: merge basic, first date, Outcomes
-# step2.1: create event col 
-# step2.2: cal end date 
-# step2.3: fill Death date col => fill 疾病_date col
-# step2.4: add follow up date col => leave data with follow up date col > 365
 dt_f <- data.table()
 for (d in names(disease_list)) {
   outcome <- disease_list[[d]]
   d_tmp <- merge(dt_merge, outcome , by = "ID", all.x = TRUE,
-                     allow.cartesian=TRUE)
+                 allow.cartesian=TRUE)
   d_tmp[, event := ifelse(is.na(DATE), 0, 1)] 
   d_tmp[, followup := DATE - Index_date]
   setnames(d_tmp, "event", paste0(d,"_event"))
@@ -248,13 +215,20 @@ for (d in names(disease_list)) {
     dt_f <- rbind(dt_f, d_tmp, fill = TRUE)
   }
 }
+head(dt_f)
+
 summary(dt_f)
 csv_file_name <- "C:/Users/USER/Downloads/disease_df/dt_f.csv"
 fwrite(dt_f, file = csv_file_name, row.names = FALSE)
-
 dim(dt_f)
+length(unique(dt_f$ID))
+names(dt_f)
+
 #===============================================================================
 # todo
+# cal end date 
+# fill Death date col => fill 疾病_date col
+# add follow up date col => leave data with follow up date col > 365
 # fill na date
 end_date <- max(d_tmp$DATE, na.rm = TRUE)
 d_tmp[is.na(DEATH_DATE), DEATH_DATE := end_date]
