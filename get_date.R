@@ -48,8 +48,9 @@ disease_code_list[["diabete"]] <- c(unique(d_tmp$ICD9), unique(d_tmp$ICD10))
 ICD9_codes_Stroke = c("430","431","432","433","434","435","436")
 ICD10_codes_Stroke = c("I60","I61","I62","I63","I64","I65","I66","I67","I68",
                        "I69")
-disease_code_list[["Stroke"]] <- c(ICD9_codes_Stroke, ICD10_codes_Stroke)
-
+#disease_code_list[["Stroke"]] <- c(ICD9_codes_Stroke, ICD10_codes_Stroke)
+d <- data.table(disease_code_list$PeripheralEnthe)
+fwrite(d, "C:/Users/USER/Downloads/id.csv", row.names = FALSE)
 #===============================================================================
 ## get data
 parameters <- list(
@@ -217,7 +218,30 @@ dt_merge[is.na(DEATH_DATE)]
 csv_file_name <- "C:/Users/USER/Downloads/disease_df/dt_f.csv"
 fwrite(dt_merge, file = csv_file_name, row.names = FALSE)
 
+#===============================================================================
+# 檢驗代號: EXP ITEM
+item_files <- c("v_exp_item_t.csv", "v_exp_item_s.csv")
+d_item <- data.table()
+for (file in item_files) {
+  d_tmp <- fread(paste0(folder_path, file))
+  d_item <- rbind(d_item, d_tmp)
+}
+d_item <- d_item[,c("R_ITEM","R_ITEM_NAME"), with = FALSE]
+HbA1C_test <- d_item[R_ITEM == "014701"]
+HbA1C_test <- unique(HbA1C_test)
 
-
+#===============================================================================
+# 檢驗結果: LAB result
+result_files <- c("v_labresult_t.csv", "v_labresult_s.csv")
+d_result <- data.table()
+for (file in result_files) {
+  d_tmp <- fread(paste0(folder_path, file))
+  d_result <- rbind(d_result, d_tmp)
+}
+d_result <- d_result[,c("CHR_NO","B_DATE","R_ITEM","VALUE"), with = FALSE]
+setnames(d_result, "CHR_NO", "ID")
+HbA1C <- d_result[R_ITEM == "014701"]
+HbA1C <- standardized_date(HbA1C, "B_DATE")
+HbA1C_valid <- merge(dt_merge, HbA1C, by = "ID", all.x = )# 
 
 
