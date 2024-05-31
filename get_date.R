@@ -45,13 +45,14 @@ d_tmp <- dt1[grepl(paste0("^", paste(ICD10_codes_diabete,
                                      collapse="|^")), ICD10)]
 d_tmp[,disease_name := "diabete"]
 disease_code_list[["diabete"]] <- c(unique(d_tmp$ICD9), unique(d_tmp$ICD10))
-ICD9_codes_Stroke = c("430","431","432","433","434","435","436")
-ICD10_codes_Stroke = c("I60","I61","I62","I63","I64","I65","I66","I67","I68",
-                       "I69")
+#ICD9_codes_Stroke = c("430","431","432","433","434","435","436")
+#ICD10_codes_Stroke = c("I60","I61","I62","I63","I64","I65","I66","I67","I68",
+#                       "I69")
 #disease_code_list[["Stroke"]] <- c(ICD9_codes_Stroke, ICD10_codes_Stroke)
 #===============================================================================
 ## get data
 parameters <- list(
+  basic_files = c("v_chr_basic_w.csv","v_chr_basic_t.csv","v_chr_basic_s.csv"),
   ori_folder_path = "C:/Users/USER/Downloads/TMUCRD_2021_csv/",
   target_folder_path = "C:/Users/USER/Downloads/disease_df/",
   target_disease = "Diabete",
@@ -89,11 +90,16 @@ parameters <- list(
   )
 )
 
+basic_files <- parameters$basic_files
 folder_path <- parameters$ori_folder_path
 target_folder_path <- parameters$target_folder_path
 disease_codes <- parameters$disease_codes
 related_diseases <- parameters$related_diseases
 target_disease <- parameters$target_disease
+outcome_diseases <- related_diseases[1:6]
+control_diseases <- related_diseases[7:length(related_diseases)]
+taget_outcome_diseases <- c(target_disease, outcome_diseases)
+
 
 for (data_set_name in names(parameters$data_sets)) {
   data_set <- parameters$data_sets[[data_set_name]]
@@ -120,7 +126,6 @@ for (data_set_name in names(parameters$data_sets)) {
 #===============================================================================
 # dt_basic: ["ID", "SEX_TYPE", "BIRTH_DATE", "DEATH_DATE" ]
 # data source:  病人資料_CHR_basic
-basic_files <- c("v_chr_basic_w.csv","v_chr_basic_t.csv","v_chr_basic_s.csv")
 dt_basic <- data.table()
 for (file in basic_files) {
   d_tmp <- fread(paste0(folder_path, file))
@@ -133,15 +138,12 @@ cols_to_pad <- c("BIRTH_DATE", "DEATH_DATE")
 dt_basic <- standardized_date(dt_basic, "BIRTH_DATE")
 dt_basic <- standardized_date(dt_basic, "DEATH_DATE") 
 setnames(dt_basic, "CHR_NO", "ID")
-dt_basic[ID==unique(dt_basic[unknown_ID==1]$ID)[1]]
+
 #===============================================================================
 # disease_list: [tb1,tb2,tb3,...]
 # tb_disease = [ID, DATE]
 disease_list <- list()
-outcome_diseases <- related_diseases[1:6]
-control_diseases <- related_diseases[7:length(related_diseases)]
-total_diseases <- c(target_disease, outcome_diseases)
-for (d in total_diseases) {
+for (d in taget_outcome_diseases) {
   disease <- d
   disease_tmp_list <- list()
   P_tmp_list <- list()
@@ -221,6 +223,7 @@ for (c in control_diseases) {
 
 #===============================================================================
 # merge basic, index_date, control disease, Outcomes  
+# 50% 
 for (d in outcome_diseases) {
   outcome <- disease_list[[d]]
   dt_merge <- merge(dt_merge, outcome , by = "ID", all.x = TRUE)
@@ -246,34 +249,28 @@ for (d in outcome_diseases) {
   setnames(dt_merge, "followup", paste0(d,"_followup"))
 }
 print(paste0("# of patients: ", length(dt_merge$ID)))
-
 csv_file_name <- "C:/Users/USER/Downloads/disease_df/dt_merge.csv"
 fwrite(dt_merge, file = csv_file_name, row.names = FALSE)
 
 #===============================================================================
 # exclude: 1. ID, 2. AGE, 3. outcome date followup
-
-print(paste0("# of unkown id: ", 
-             length((dt_merge[dt_merge[,unknown_ID==1]]$ID))))
-filtered_data <- dt_merge[dt_merge[,unknown_ID!=1]]
+print(paste0("# of unkown id: ", length(dt_merge[dt_merge[,unknown_ID==1]]$ID)))
+dt_merge <- dt_merge[dt_merge[,unknown_ID!=1]]
 print(paste0("# of out of range age: ", 
-             nrow(filtered_data[!(AGE >= 20 & AGE <= 100),])))
-filtered_data <- filtered_data[(AGE >= 20 & AGE <= 100), ]
-print(paste0("# of patients: ", length(filtered_data$ID)))
-
+             nrow(dt_merge[!(AGE >= 20 & AGE <= 100),])))
+dt_merge <- dt_merge[(AGE >= 20 & AGE <= 100), ]
+print(paste0("# of patients: ", length(dt_merge$ID)))
 outcome_list <- list()
 for (o in outcome_diseases) {
   col <- paste0(o,"_followup")
-  d_tmp <- filtered_data[get(col) <= 365] 
-  # filter
+  d_tmp <- dt_merge[get(col) >= 365] 
   outcome_col <- c(names(d_tmp)[1:27], paste0(o,"_Date"),paste0(o,"_event"), 
                    paste0(o,"_followup"))
-  d_tmp <- d_tmp[, ..outcome_col]  
+  d_tmp <- d_tmp[, ..outcome_col]
   outcome_list[[o]] <- d_tmp
-  print(paste0("# of out of range ", o, ": ", (nrow(filtered_data)-nrow(d_tmp))))
+  print(paste0("# of out of range ", o, ": ", (nrow(dt_merge)-nrow(d_tmp))))
   print(paste0("# of ", o, ": ", nrow(d_tmp)))
   csv_file_name <- paste0(target_folder_path,o,"_clean.csv")
   fwrite(d_tmp, file = csv_file_name, row.names = FALSE)
 }
-
-
+summary(dt_merge)
