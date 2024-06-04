@@ -4,6 +4,8 @@ setwd(new_dir)
 source("tool_function/fetch_function.R")
 source("tool_function/standard_function.R")
 library(stringr)
+library(ggplot2)
+
 #===============================================================================
 ## get disease code list
 folder_path2 = "C:/Users/USER/Downloads/TMUCRD_2021_csv/"
@@ -49,8 +51,9 @@ disease_code_list[["diabete"]] <- c(unique(d_tmp$ICD9), unique(d_tmp$ICD10))
 #ICD10_codes_Stroke = c("I60","I61","I62","I63","I64","I65","I66","I67","I68",
 #                       "I69")
 #disease_code_list[["Stroke"]] <- c(ICD9_codes_Stroke, ICD10_codes_Stroke)
+
 #===============================================================================
-## get data
+# set parameters
 parameters <- list(
   basic_files = c("v_chr_basic_w.csv","v_chr_basic_t.csv","v_chr_basic_s.csv"),
   ori_folder_path = "C:/Users/USER/Downloads/TMUCRD_2021_csv/",
@@ -100,7 +103,8 @@ outcome_diseases <- related_diseases[1:6]
 control_diseases <- related_diseases[7:length(related_diseases)]
 taget_outcome_diseases <- c(target_disease, outcome_diseases)
 
-
+#===============================================================================
+# get data
 for (data_set_name in names(parameters$data_sets)) {
   data_set <- parameters$data_sets[[data_set_name]]
   dt_file_list <- data_set$file_list
@@ -133,7 +137,6 @@ for (file in basic_files) {
 }
 dt_basic <- dt_basic[, c("CHR_NO","SEX_TYPE","BIRTH_DATE","DEATH_DATE"),
                      with = FALSE]
-dt_basic[, unknown_ID := ifelse(.N > 1, 1, 0), by = CHR_NO]
 cols_to_pad <- c("BIRTH_DATE", "DEATH_DATE")
 dt_basic <- standardized_date(dt_basic, "BIRTH_DATE")
 dt_basic <- standardized_date(dt_basic, "DEATH_DATE") 
@@ -223,7 +226,6 @@ for (c in control_diseases) {
 
 #===============================================================================
 # merge basic, index_date, control disease, Outcomes  
-# 50% 
 for (d in outcome_diseases) {
   outcome <- disease_list[[d]]
   dt_merge <- merge(dt_merge, outcome , by = "ID", all.x = TRUE)
@@ -249,28 +251,142 @@ for (d in outcome_diseases) {
   setnames(dt_merge, "followup", paste0(d,"_followup"))
 }
 print(paste0("# of patients: ", length(dt_merge$ID)))
-csv_file_name <- "C:/Users/USER/Downloads/disease_df/dt_merge.csv"
-fwrite(dt_merge, file = csv_file_name, row.names = FALSE)
+#csv_file_name <- "C:/Users/USER/Downloads/disease_df/dt_merge.csv"
+#fwrite(dt_merge, file = csv_file_name, row.names = FALSE)
 
 #===============================================================================
-# exclude: 1. ID, 2. AGE, 3. outcome date followup
-print(paste0("# of unkown id: ", length(dt_merge[dt_merge[,unknown_ID==1]]$ID)))
-dt_merge <- dt_merge[dt_merge[,unknown_ID!=1]]
-print(paste0("# of out of range age: ", 
-             nrow(dt_merge[!(AGE >= 20 & AGE <= 100),])))
-dt_merge <- dt_merge[(AGE >= 20 & AGE <= 100), ]
-print(paste0("# of patients: ", length(dt_merge$ID)))
+## exclude: 1. ID, 2. AGE, 3. Index Date, 4. outcome date followup 
+# ID
+dt_merge[, exclude_ID := ifelse(.N > 1, 1, 0), by = ID]
+print(paste0("# of exclude id: ", length(d_tmp[d_tmp[,exclude_ID==1]]$ID)))
+
+# AGE
+dt_merge[, exclude_AGE := ifelse(AGE < 20 | AGE > 100, 1, 0)]
+print(paste0("# of exclude age: ", 
+             length(dt_merge[dt_merge[,exclude_AGE==1&
+                                       exclude_ID==0]]$ID)))
+
+# valid index date
+valid_Index_date <- min(dt_merge$Index_date)+365
+dt_merge[, exclude_Indexdate := ifelse(Index_date < valid_Index_date, 1, 0)]
+print(paste0("# of not enough observe date:  ", 
+             length(dt_merge[dt_merge[, exclude_Indexdate==1&
+                                        exclude_ID==0&
+                                        exclude_AGE==0]]$ID)))
+# step1: check # of patients 
+print(paste0("# of patients: ", 
+             length(dt_merge[dt_merge[, exclude_Indexdate==0&
+                                        exclude_ID==0&
+                                        exclude_AGE==0]]$ID)))
+# outcome date followup
 outcome_list <- list()
+
 for (o in outcome_diseases) {
   col <- paste0(o,"_followup")
-  d_tmp <- dt_merge[get(col) >= 365] 
-  outcome_col <- c(names(d_tmp)[1:27], paste0(o,"_Date"),paste0(o,"_event"), 
-                   paste0(o,"_followup"))
+  dt_merge[, exclude_outcome1 := ifelse(get(col) < 0, 1, 0)]
+  dt_merge[, exclude_outcome2 := ifelse(get(col) <= 365 & get(col) >= 0, 1, 0)]
+  d_tmp <- dt_merge
+  outcome_col <- c(names(d_tmp)[1:26], paste0(o,"_Date"),paste0(o,"_event"), 
+                   paste0(o,"_followup"), names(d_tmp)[46:50])
   d_tmp <- d_tmp[, ..outcome_col]
-  outcome_list[[o]] <- d_tmp
-  print(paste0("# of out of range ", o, ": ", (nrow(dt_merge)-nrow(d_tmp))))
-  print(paste0("# of ", o, ": ", nrow(d_tmp)))
+  outcome_list[[o]] <- d_tmp 
+  # ! by 條件count => by sum堤建:
+  print(paste0("# of out of range1 ", o, ": ", 
+               length(d_tmp[d_tmp[,(exclude_ID==0&
+                                    exclude_AGE==0&
+                                    exclude_Indexdate==0&
+                                    exclude_outcome1==1&
+                                    exclude_outcome2==0)]]$ID)))
+  print(paste0("# of out of range2 ", o, ": ", 
+               length(d_tmp[d_tmp[,(exclude_ID==0&
+                                    exclude_AGE==0&
+                                    exclude_Indexdate==0&
+                                    exclude_outcome1==0&
+                                    exclude_outcome2==1)]]$ID)))
+  print(paste0("# of patients: ", 
+               length(d_tmp[d_tmp[,(exclude_ID==0&
+                                    exclude_AGE==0&
+                                    exclude_Indexdate==0&
+                                    exclude_outcome1==0&
+                                    exclude_outcome2==0)]]$ID)))
+  
   csv_file_name <- paste0(target_folder_path,o,"_clean.csv")
   fwrite(d_tmp, file = csv_file_name, row.names = FALSE)
 }
-summary(dt_merge)
+
+#===============================================================================
+## 檢驗結果: LAB result # 缺萬芳 # other files
+result_files <- c("v_labresult_t.csv", "v_labresult_s.csv")
+d_result <- data.table()
+for (file in result_files) {
+  d_tmp <- fread(paste0(folder_path, file))
+  d_result <- rbind(d_result, d_tmp)
+}
+d_result <- d_result[,c("CHR_NO","B_DATE","R_ITEM","VALUE"), with = FALSE]
+setnames(d_result, "CHR_NO", "ID")
+d_result <- standardized_date(d_result, "B_DATE")
+
+#===============================================================================
+# 檢驗代號: EXP ITEM # 缺萬芳
+item_files <- c("v_exp_item_t.csv", "v_exp_item_s.csv")
+d_item <- data.table()
+for (file in item_files) {
+  d_tmp <- fread(paste0(folder_path, file))
+  d_item <- rbind(d_item, d_tmp)
+}
+d_item <- d_item[,c("R_ITEM","R_ITEM_NAME"), with = FALSE]
+
+#===============================================================================
+# merge id, item name, count 
+dt_eye <- outcome_list$EyeComp
+dt_eye <- dt_eye[dt_eye[, exclude_Indexdate==0&
+                          exclude_ID==0&
+                          exclude_AGE==0]]
+dt_eye <- merge(dt_eye, d_result, by = "ID", all.y = TRUE) 
+dt_count <- as.data.table(table(dt_eye$R_ITEM))
+setnames(dt_count, "V1", "R_ITEM")
+dt_count <- merge(d_item, dt_count, by = "R_ITEM", all.y = TRUE)
+dt_count <- dt_count[order(-N)]
+dt_count <- dt_count[!duplicated(dt_count)]
+csv_file_name <- paste0(target_folder_path, "test_items.csv")
+fwrite(dt_count, file = csv_file_name, row.names = FALSE)
+
+#===============================================================================
+# example: ALBUMIN
+ALBUMIN_dt <- d_item[grep("ALBUMIN", R_ITEM_NAME, ignore.case = TRUE)]
+ALBUMIN_ID <- c("010301","11D101")
+ALBUMIN <- dt_eye[grepl(paste0("^", paste(ALBUMIN_ID, collapse="|^")), R_ITEM)]
+d_t <- ALBUMIN[, clean_value := str_replace_all(VALUE, "(?i) g/dl", "")]
+d_t <- d_t[, clean_value := str_replace_all(clean_value, "<", "")] # drop
+d_t <- d_t[, numeric_value := as.numeric(clean_value)]
+d_t[is.na(d_t$numeric_value)]# check na
+
+# Create density plot using ggplot2
+ggplot(d_t, aes(x = numeric_value)) +
+  geom_density() +
+  ggtitle("Density Plot") +
+  labs(x = "ALBUMIN_values", y = "Density", title = "Density Plot")
+
+# HbA1c
+HbA1c_dt <- d_item[grep("HbA1c", R_ITEM_NAME, ignore.case = TRUE)]
+HbA1c_ID <- "014701"
+HbA1c <- dt_eye[grep(HbA1c_ID, R_ITEM, ignore.case = TRUE)]
+d_t <- HbA1c[, clean_value := str_replace_all(VALUE, "(?i) g/dl", "")] # transfer 
+d_t <- d_t[, clean_value := str_replace_all(clean_value, "%", "")] # transfer
+d_t <- d_t[, clean_value := str_replace_all(clean_value, ">", "")] 
+d_t <- d_t[, numeric_value := as.numeric(clean_value)]
+d_t[is.na(d_t$numeric_value)]# check na
+
+# Create density plot using ggplot2
+ggplot(d_t, aes(x = numeric_value)) +
+  geom_density() +
+  ggtitle("Density Plot") + 
+  labs(x = "HbA1c_values", y = "Density", title = "Density Plot")
+
+A <- c("R_ITEM", "VALUE")
+csv_file_name <- paste0(target_folder_path, "HbA1c.csv")
+fwrite(d_t[,..A], file = csv_file_name, row.names = FALSE)
+
+# exclude 修改
+# Todo: 看各月份前後15天 
+# 人數連續狀況 避免月份人ID
