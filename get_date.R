@@ -251,142 +251,84 @@ for (d in outcome_diseases) {
   setnames(dt_merge, "followup", paste0(d,"_followup"))
 }
 print(paste0("# of patients: ", length(dt_merge$ID)))
-#csv_file_name <- "C:/Users/USER/Downloads/disease_df/dt_merge.csv"
-#fwrite(dt_merge, file = csv_file_name, row.names = FALSE)
 
 #===============================================================================
 ## exclude: 1. ID, 2. AGE, 3. Index Date, 4. outcome date followup 
-# ID
+# create exclude column
 dt_merge[, exclude_ID := ifelse(.N > 1, 1, 0), by = ID]
-print(paste0("# of exclude id: ", length(d_tmp[d_tmp[,exclude_ID==1]]$ID)))
-
-# AGE
 dt_merge[, exclude_AGE := ifelse(AGE < 20 | AGE > 100, 1, 0)]
-print(paste0("# of exclude age: ", 
-             length(dt_merge[dt_merge[,exclude_AGE==1&
-                                       exclude_ID==0]]$ID)))
-
-# valid index date
 valid_Index_date <- min(dt_merge$Index_date)+365
 dt_merge[, exclude_Indexdate := ifelse(Index_date < valid_Index_date, 1, 0)]
-print(paste0("# of not enough observe date:  ", 
-             length(dt_merge[dt_merge[, exclude_Indexdate==1&
-                                        exclude_ID==0&
-                                        exclude_AGE==0]]$ID)))
-# step1: check # of patients 
-print(paste0("# of patients: ", 
-             length(dt_merge[dt_merge[, exclude_Indexdate==0&
-                                        exclude_ID==0&
-                                        exclude_AGE==0]]$ID)))
+
+# 定义条件和消息列表
+conditions <- list(
+  exclude_ID = quote(exclude_ID == 1),
+  exclude_AGE = quote(exclude_AGE == 1 & exclude_ID == 0),
+  exclude_Indexdate = quote(exclude_Indexdate == 1 & exclude_ID == 0 & exclude_AGE == 0),
+  patients = quote(exclude_Indexdate == 0 & exclude_ID == 0 & exclude_AGE == 0)
+)
+
+messages <- list(
+  exclude_ID = "# of exclude ID: ",
+  exclude_AGE = "# of exclude AGE: ",
+  exclude_Indexdate = "# of not enough observe date: ",
+  patients = "# of patients: "
+)
+
+# 打印结果
+for (cond_name in names(conditions)) {
+  condition <- conditions[[cond_name]]
+  message <- messages[[cond_name]]
+  count <- length(dt_merge[eval(condition)]$ID)
+  print(paste0(message, count))
+}
+
+
+csv_file_name <- "C:/Users/USER/Downloads/disease_df/dt_merge.csv"
+fwrite(dt_merge, file = csv_file_name, row.names = FALSE)
+
 # outcome date followup
 outcome_list <- list()
+condition2 <- list(
+  e1 = quote(exclude_outcome1 == 1 & exclude_ID == 0 & 
+                             exclude_AGE == 0 & exclude_Indexdate == 0 &
+                             exclude_outcome2 == 0),
+  e2 = quote(exclude_outcome2 == 1 & exclude_ID == 0 & 
+                             exclude_AGE == 0 & exclude_Indexdate == 0 &
+                             exclude_outcome1 == 0),
+  ps = quote(exclude_outcome2 == 1 & exclude_ID == 0 & 
+                     exclude_AGE == 0 & exclude_Indexdate == 0 &
+                     exclude_outcome1 == 0)
+)
+
+# define message
+messages2 <- list(
+  e1 = "# of Outcome1: ",
+  e2 = "# of Outcome2: ",
+  ps = "# of patients: "
+)
 
 for (o in outcome_diseases) {
+  i <- outcome_diseases[1]
   col <- paste0(o,"_followup")
-  dt_merge[, exclude_outcome1 := ifelse(get(col) < 0, 1, 0)]
-  dt_merge[, exclude_outcome2 := ifelse(get(col) <= 365 & get(col) >= 0, 1, 0)]
   d_tmp <- dt_merge
+  d_tmp[, exclude_outcome1 := ifelse(get(col) < 0, 1, 0)]
+  d_tmp[, exclude_outcome2 := ifelse(get(col) <= 365 & get(col) >= 0, 1, 0)]
+
   outcome_col <- c(names(d_tmp)[1:26], paste0(o,"_Date"),paste0(o,"_event"), 
                    paste0(o,"_followup"), names(d_tmp)[46:50])
   d_tmp <- d_tmp[, ..outcome_col]
-  outcome_list[[o]] <- d_tmp 
-  # ! by 條件count => by sum堤建:
-  print(paste0("# of out of range1 ", o, ": ", 
-               length(d_tmp[d_tmp[,(exclude_ID==0&
-                                    exclude_AGE==0&
-                                    exclude_Indexdate==0&
-                                    exclude_outcome1==1&
-                                    exclude_outcome2==0)]]$ID)))
-  print(paste0("# of out of range2 ", o, ": ", 
-               length(d_tmp[d_tmp[,(exclude_ID==0&
-                                    exclude_AGE==0&
-                                    exclude_Indexdate==0&
-                                    exclude_outcome1==0&
-                                    exclude_outcome2==1)]]$ID)))
-  print(paste0("# of patients: ", 
-               length(d_tmp[d_tmp[,(exclude_ID==0&
-                                    exclude_AGE==0&
-                                    exclude_Indexdate==0&
-                                    exclude_outcome1==0&
-                                    exclude_outcome2==0)]]$ID)))
   
+  for (cond_name in names(condition2)) {
+    cond_name <- names(condition2)[1]
+    condition <- conditions2[[cond_name]]
+    message <- messages2[[cond_name]]
+    count <- length(d_tmp[eval(condition2)]$ID)
+    print(paste0(message2, count))
+  }
+
+  outcome_list[[o]] <- d_tmp 
   csv_file_name <- paste0(target_folder_path,o,"_clean.csv")
   fwrite(d_tmp, file = csv_file_name, row.names = FALSE)
 }
 
-#===============================================================================
-## 檢驗結果: LAB result # 缺萬芳 # other files
-result_files <- c("v_labresult_t.csv", "v_labresult_s.csv")
-d_result <- data.table()
-for (file in result_files) {
-  d_tmp <- fread(paste0(folder_path, file))
-  d_result <- rbind(d_result, d_tmp)
-}
-d_result <- d_result[,c("CHR_NO","B_DATE","R_ITEM","VALUE"), with = FALSE]
-setnames(d_result, "CHR_NO", "ID")
-d_result <- standardized_date(d_result, "B_DATE")
-
-#===============================================================================
-# 檢驗代號: EXP ITEM # 缺萬芳
-item_files <- c("v_exp_item_t.csv", "v_exp_item_s.csv")
-d_item <- data.table()
-for (file in item_files) {
-  d_tmp <- fread(paste0(folder_path, file))
-  d_item <- rbind(d_item, d_tmp)
-}
-d_item <- d_item[,c("R_ITEM","R_ITEM_NAME"), with = FALSE]
-
-#===============================================================================
-# merge id, item name, count 
-dt_eye <- outcome_list$EyeComp
-dt_eye <- dt_eye[dt_eye[, exclude_Indexdate==0&
-                          exclude_ID==0&
-                          exclude_AGE==0]]
-dt_eye <- merge(dt_eye, d_result, by = "ID", all.y = TRUE) 
-dt_count <- as.data.table(table(dt_eye$R_ITEM))
-setnames(dt_count, "V1", "R_ITEM")
-dt_count <- merge(d_item, dt_count, by = "R_ITEM", all.y = TRUE)
-dt_count <- dt_count[order(-N)]
-dt_count <- dt_count[!duplicated(dt_count)]
-csv_file_name <- paste0(target_folder_path, "test_items.csv")
-fwrite(dt_count, file = csv_file_name, row.names = FALSE)
-
-#===============================================================================
-# example: ALBUMIN
-ALBUMIN_dt <- d_item[grep("ALBUMIN", R_ITEM_NAME, ignore.case = TRUE)]
-ALBUMIN_ID <- c("010301","11D101")
-ALBUMIN <- dt_eye[grepl(paste0("^", paste(ALBUMIN_ID, collapse="|^")), R_ITEM)]
-d_t <- ALBUMIN[, clean_value := str_replace_all(VALUE, "(?i) g/dl", "")]
-d_t <- d_t[, clean_value := str_replace_all(clean_value, "<", "")] # drop
-d_t <- d_t[, numeric_value := as.numeric(clean_value)]
-d_t[is.na(d_t$numeric_value)]# check na
-
-# Create density plot using ggplot2
-ggplot(d_t, aes(x = numeric_value)) +
-  geom_density() +
-  ggtitle("Density Plot") +
-  labs(x = "ALBUMIN_values", y = "Density", title = "Density Plot")
-
-# HbA1c
-HbA1c_dt <- d_item[grep("HbA1c", R_ITEM_NAME, ignore.case = TRUE)]
-HbA1c_ID <- "014701"
-HbA1c <- dt_eye[grep(HbA1c_ID, R_ITEM, ignore.case = TRUE)]
-d_t <- HbA1c[, clean_value := str_replace_all(VALUE, "(?i) g/dl", "")] # transfer 
-d_t <- d_t[, clean_value := str_replace_all(clean_value, "%", "")] # transfer
-d_t <- d_t[, clean_value := str_replace_all(clean_value, ">", "")] 
-d_t <- d_t[, numeric_value := as.numeric(clean_value)]
-d_t[is.na(d_t$numeric_value)]# check na
-
-# Create density plot using ggplot2
-ggplot(d_t, aes(x = numeric_value)) +
-  geom_density() +
-  ggtitle("Density Plot") + 
-  labs(x = "HbA1c_values", y = "Density", title = "Density Plot")
-
-A <- c("R_ITEM", "VALUE")
-csv_file_name <- paste0(target_folder_path, "HbA1c.csv")
-fwrite(d_t[,..A], file = csv_file_name, row.names = FALSE)
-
-# exclude 修改
-# Todo: 看各月份前後15天 
-# 人數連續狀況 避免月份人ID
