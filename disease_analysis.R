@@ -39,7 +39,6 @@ for (file in result_files) {
   d_result <- rbind(d_result, d_tmp)
 }
 names(d_result)
-
 d_result <- d_result[,c("CHR_NO","P_DATE", "B_DATE","O_ITEM","R_ITEM","VALUE"), 
                      with = FALSE]
 d_result[d_result$O_ITEM=="0147",unique(R_ITEM)]
@@ -63,40 +62,105 @@ d_item <- d_item[,c("R_ITEM","R_ITEM_NAME"), with = FALSE]
 ## 檢驗結果2: v_exper_sign_w.csv
 result_files2 <- c("v_exper_sign_w.csv")
 d_result2 <- fread(paste0(folder_path, result_files2))
-names(d_result2)
-
-d_result2[d_result2$GROUP_CODE =="F09006B"]
-
-
-
-
-d_result2 <- d_result2[,c("CHR_NO", "EXPER_NO","COMP_DATE","EXPER_DATA",
+d_result2 <- d_result2[,c("CHR_NO", "EXPER_DATE","GROUP_CODE","EXPER_DATA",
                           "EXPER_DATA2","EXPER_DATA3","EXPER_DATA4",
-                          "EXPER_DATA5","ITEM_NO"), with = FALSE]
+                          "EXPER_DATA5"), 
+                       with = FALSE]
+d_result2 <- standardized_date(d_result2, "EXPER_DATE")
+csv_file_name <- paste0(target_folder_path,"renew_result.csv")
+fwrite(d_result2, file = csv_file_name, row.names = FALSE)
+setnames(d_result2,"CHR_NO","ID")
+d_result2[d_result2$GROUP_CODE =="F09015C"]
+#===============================================================================
+# select disease
+d_result2[d_result2$GROUP_CODE =="F09025C"]
+HbA1c_w <- d_result2[d_result2$GROUP_CODE =="F09006B"]
 
+HbA1c_w <- HbA1c_w[, `:=`(clean_value = str_replace_all(EXPER_DATA2, "%", ""), 
+                          unit = "%")]
+# exclude outliers: < > 
+HbA1c_w <- HbA1c_w[, outliers := ifelse(grepl("[><]", clean_value), 1, 0)]
+cat("# of outliers: ",nrow(HbA1c_w[HbA1c_w[,outliers==1]]))
+HbA1c_w <- HbA1c_w[HbA1c_w[,outliers==0]]
+cat(" # of data:", nrow(HbA1c_w), "\n", "# of ID:", length(unique(HbA1c_w$ID)))
 
-d_it <- fread(paste0(folder_path, "v_exper_referdata_w.csv"))
+HbA1c_w <- HbA1c_w[, numeric_value := as.numeric(clean_value)]
+HbA1c_w <- HbA1c_w[!is.na(HbA1c_w$numeric_value)]
+HbA1c_w[,R_ITEM := "014701"]
+names(HbA1c_w)
+# merge id, item name, count 
+dt_diabete <- fread(paste0(target_folder_path,"EyeComp_clean.csv"))
+exclude_columns <- c("exclude_AGE", "exclude_ID", "exclude_Indexdate")
 
-d_r <- fread(paste0(folder_path, "v_labresult_bound_t.csv"))
-names(d_r) # FEE_
+# exclude
+dt_diabete <- dt_diabete[apply(dt_diabete[, ..exclude_columns], 1, sum) < 1]
+dt_diabete <- merge(dt_diabete, HbA1c_w, by = "ID", all.x = TRUE) 
+names(dt_diabete)
+#===============================================================================
+# select valid data & data summary
+select_col <- c("ID", "SEX_TYPE", "Index_date", "EXPER_DATE")
+d_tmp <- dt_diabete[,..select_col]
+d_tmp <- d_tmp[, followup:= as.numeric(EXPER_DATE-as.Date(Index_date)) ]
+d_tmp <- d_tmp[!is.na(followup)]
+status_followup <- data.table(unique(d_tmp[["ID"]]))
+setnames(status_followup, "V1", "ID")
+num_interval <- 5
+tracking_interval <- 90
+event_interval <- 45
+for (m in 0:(num_interval-1)) {
+  lower <- m * tracking_interval - event_interval
+  upper <- m * tracking_interval + event_interval
+  d_tmp[, event := as.integer(followup >= lower & followup <= upper)]
+  dt <- d_tmp[, .(event = as.integer(any(event == 1))), by = ID]
+  cat("coverage_ratio:", (sum(dt$event)/nrow(dt)),"\n" ) 
+  setnames(dt, "event", paste0("m_", m))
+  status_followup <- merge(status_followup, dt, by = "ID")
+}
 
+# valid ID: by rowsum = num_interval
+test_dist_n <- status_followup[,-1]
+row_sum <- rowSums(test_dist_n)
+valid_ID <- status_followup[row_sum==num_interval]$ID
 
+cat(" # of data:", nrow(dt_diabete), "\n", "# of ID:", 
+    length(unique(dt_diabete$ID)))
 
-head(d_result2)
-d_result2[!is.na(d_result2$REPORT)]
+HbA1c_valid_dt <- dt_diabete[ID %in% valid_ID]
+cat(" # of data:", nrow(HbA1c_valid_dt), "\n", "# of ID:", 
+    length(unique(HbA1c_valid_dt$ID)))
 
+select_col <- c("ID", "Index_date", "EXPER_DATE", "numeric_value","unit")
+HbA1c_valid_dt <- HbA1c_valid_dt[,..select_col]
+HbA1c_valid_dt <- HbA1c_valid_dt[, followup:= as.numeric(EXPER_DATE-as.Date(Index_date)) ]
 
-d_result2 <- d_result2[,c("CHR_NO", "CONF_DATE",
-                          "EXPER_NO","ITEM_NO", "REPORT"), with = FALSE]
-setnames(d_result2, "CHR_NO", "ID")
+HbA1c_valid_dt[, interval := floor(followup / tracking_interval) + 1]
+HbA1c_valid_dt <- HbA1c_valid_dt[interval <= num_interval & interval >= 0]
 
-## 檢驗結果2:  EXPERIMENT  
-d1 <- fread(paste0(folder_path, "v_experiment_t.csv"))
-d1 <- d1[,c("ITEM_NO", "ITEM_NAME"), with = FALSE]
-HbA1c_d1 <- d1[grep("HbA1c", ITEM_NAME, ignore.case = TRUE)]
+cat(" # of data:", nrow(HbA1c_valid_dt), "\n", "# of ID:", 
+    length(unique(HbA1c_valid_dt$ID)))
 
-HbA1cd2 <- d_result2[grep(HbA1c_d1$ITEM_NO, ITEM_NO, ignore.case = TRUE)]
-HbA1cd2[!is.na(HbA1cd2$REPORT)]
+result <- HbA1c_valid_dt[, .(
+  mean_value = mean(numeric_value, na.rm = TRUE),
+  median_value = median(numeric_value, na.rm = TRUE),
+  sd_value = sd(numeric_value, na.rm = TRUE),
+  n = .N
+), by = .(ID, interval)]
+
+result_wide <- dcast(result, ID ~ interval, 
+                     value.var = c("mean_value", "median_value", "sd_value", 
+                                   "n"))
+
+result_wide[, total := rowSums((.SD),na.rm = TRUE), 
+            .SDcols = paste0("n_", 0:num_interval)]
+
+csv_file_name <- paste0(target_folder_path,as.character(tracking_interval), 
+                        "_interval_summary_w.csv")
+fwrite(result_wide, file = csv_file_name, row.names = FALSE)
+
+na_counts <- sapply(result_wide, function(x) sum(is.na(x)))
+na_counts
+print(result_wide)
+
 
 
 
@@ -169,6 +233,7 @@ HbA1c_dt <- d_item[grep("HbA1c", R_ITEM_NAME, ignore.case = TRUE)]
 HbA1c_ID <- unique(HbA1c_dt[["R_ITEM"]])
 HbA1c <- dt_diabete[grep(HbA1c_ID, R_ITEM, ignore.case = TRUE)]
 cat(" # of data:", nrow(HbA1c), "\n", "# of ID:", length(unique(HbA1c$ID)))
+
 # clean values
 HbA1c <- HbA1c[, `:=`(clean_value = str_replace_all(VALUE, "%", ""), 
                       unit = "%")]
@@ -181,6 +246,7 @@ cat(" # of data:", nrow(HbA1c), "\n", "# of ID:", length(unique(HbA1c$ID)))
 HbA1c <- HbA1c[, numeric_value := as.numeric(clean_value)]
 HbA1c[is.na(HbA1c$numeric_value)]
 summary(HbA1c) 
+na_counts1 <- sapply(HbA1c, function(x) sum(is.na(x)))
 
 #===============================================================================
 # exclude 檢測日 < 確診日
@@ -197,44 +263,70 @@ print(paste0("# of not_enough_data: ",nrow(HbA1c[HbA1c[,not_enough_data==1]])))
 print(paste0("# of not_enough_data_ID: ",
              length(unique(HbA1c[HbA1c[,not_enough_data==1]]$ID))))
 #===============================================================================
-# aggregate: 檢測情況
-# check different time interval 
+# select valid data & data summary
 select_col <- c("ID", "SEX_TYPE", "Index_date", "P_DATE", "B_DATE")
 d_tmp <- HbA1c[,..select_col]
-#d_tmp <- d_tmp[, followup:= as.numeric(P_DATE-as.Date(Index_date)) ]
-d_tmp <- d_tmp[, followup:= as.numeric(B_DATE-as.Date(Index_date)) ]
-test_dist <- data.table(unique(d_tmp[["ID"]]))
-setnames(test_dist, "V1", "ID")
-unit_time <- 4
-index_interval <- 90
-event_interval <- 45
+d_tmp <- d_tmp[, followup:= as.numeric(P_DATE-as.Date(Index_date)) ]
 
-for (m in 0:unit_time) {
-  lower <- m * index_interval - event_interval
-  upper <- m * index_interval + event_interval
+status_followup <- data.table(unique(d_tmp[["ID"]]))
+setnames(status_followup, "V1", "ID")
+num_interval <- 5
+tracking_interval <- 90
+event_interval <- 45
+for (m in 0:(num_interval-1)) {
+  lower <- m * tracking_interval - event_interval
+  upper <- m * tracking_interval + event_interval
   d_tmp[, event := as.integer(followup >= lower & followup <= upper)]
-  event_status <- c
-  # by id count 
-  for (i in unique(d_tmp$ID)) {
-    dt <- d_tmp[ID %in% i]
-    event_status <- c(event_status, ifelse(sum(dt$event) >= 1, 1, 0))
-  }
-  dt2 <- data.table(ID = unique(d_tmp$ID), event = event_status)
-  cat("coverage_ratio:", (sum(dt2$event)/nrow(dt2)),"\n" ) # check
-  setnames(dt2, "event", paste0("m_", m))
-  test_dist <- merge(test_dist, dt2, by = "ID")
+  dt <- d_tmp[, .(event = as.integer(any(event == 1))), by = ID]
+  cat("coverage_ratio:", (sum(dt$event)/nrow(dt)),"\n" ) 
+  setnames(dt, "event", paste0("m_", m))
+  status_followup <- merge(status_followup, dt, by = "ID")
 }
 
-test_dist_n <- test_dist[,-1]
+# valid ID: by rowsum = num_interval
+test_dist_n <- status_followup[,-1]
 row_sum <- rowSums(test_dist_n)
-test_dist_n[row_sum==5]
+valid_ID <- status_followup[row_sum==num_interval]$ID
+valid_ID
+
+HbA1c_valid_dt <- HbA1c[ID %in% valid_ID]
+cat(" # of data:", nrow(HbA1c_valid_dt), "\n", "# of ID:", 
+    length(unique(HbA1c_valid_dt$ID)))
+
+select_col <- c("ID", "Index_date", "P_DATE", "numeric_value","unit")
+HbA1c_valid_dt <- HbA1c_valid_dt[,..select_col]
+HbA1c_valid_dt <- HbA1c_valid_dt[, followup:= as.numeric(P_DATE-as.Date(Index_date)) ]
+
+HbA1c_valid_dt[, interval := floor(followup / tracking_interval) + 1]
+HbA1c_valid_dt <- HbA1c_valid_dt[interval <= num_interval & interval >= 0]
+cat(" # of data:", nrow(HbA1c_valid_dt), "\n", "# of ID:", 
+    length(unique(HbA1c_valid_dt$ID)))
+
+result <- HbA1c_valid_dt[, .(
+  mean_value = mean(numeric_value, na.rm = TRUE),
+  median_value = median(numeric_value, na.rm = TRUE),
+  sd_value = sd(numeric_value, na.rm = TRUE),
+  n = .N
+), by = .(ID, interval)]
+
+result_wide <- dcast(result, ID ~ interval, 
+                     value.var = c("mean_value", "median_value", "sd_value", 
+                                   "n"))
+
+result_wide[, total := rowSums((.SD),na.rm = TRUE), 
+            .SDcols = paste0("n_", 0:num_interval)]
 
 
 
-# go back check data 
-a <- test_dist[test_dist$m_0==0]$ID
-d_tmp[ID %in% a[3]]
+csv_file_name <- paste0(target_folder_path,as.character(tracking_interval), 
+                        "_interval_summary.csv")
+fwrite(result_wide, file = csv_file_name, row.names = FALSE)
 
+na_counts <- sapply(result_wide, function(x) sum(is.na(x)))
+na_counts
+print(result_wide)
+
+#===============================================================================
 for (col in names(test_dist_numeric)) {
   hist_data <- test_dist_numeric[[col]]
   p <-   ggplot(data.frame(x = hist_data), aes(x)) +
@@ -277,60 +369,3 @@ ggsave(HbA1c_png_name, plot = p, width = 8, height = 6, dpi = 300,
        bg = "white")
 
 
-#===============================================================================
-# transfer to %
-# remove not enough test data
-# cal HAb1c variability
-ALBUMIN_Diabete_ID <- length(unique(ALBUMIN$ID))
-HbA1c_Diabete_ID <- length(unique(HbA1c$ID))
-print(paste0("no HbA1c test data: ",total_ID - ALBUMIN_Diabete_ID))
-print(paste0("no HbA1c test data: ",total_ID - HbA1c_Diabete_ID))
-
-x1 <- data.table()
-for (i in 1:HbA1c_Diabete_ID) {
-  dt1 <- HbA1c[ID %in% unique(HbA1c$ID)[i]]
-  
-  # 過濾 value 欄位 
-  dt1 <- dt1[, numeric_value := numeric_value / 100]
-  
-  # sort values by (B_DATE)
-  dt1 <- dt1[order(B_DATE)]
-  
-  # 計算每個數值與前一筆之間的差異 # warning here: shift()
-  dt1 <- dt1[, diff := numeric_value - shift(numeric_value, type = "lag")]
-  
-  # 判斷差異是否大於 0.005 (即 0.5%)
-  dt1 <- dt1[, diff_gt_0.5pct := abs(diff) > 0.005]
-  
-  # 計算 HVS 的分子部分 (大於 0.5% 的次數)
-  HVS_numerator <- sum(dt1[["diff_gt_0.5pct"]], na.rm = TRUE)
-  
-  # 計算 HVS (分子部分除以總個數)
-  HVS <- (HVS_numerator / nrow(dt1)) 
-  
-  # 計算均值 (mean)
-  mean_value <- mean(dt1$numeric_value, na.rm = TRUE)
-  
-  # 計算標準差 (SD)
-  sd_value <- sd(dt1$numeric_value, na.rm = TRUE)
-  
-  # 計算均方根 (RMS)
-  rms_value <- sqrt(mean(dt1$numeric_value^2, na.rm = TRUE))
-  
-  # 計算變異係數 (CV)
-  cv_value <- sd_value / mean_value
-  
-  # 每一個病人
-  x <- data.table(
-    "ID" = unique(dt1$ID),
-    "SEX" = unique(dt1$SEX_TYPE),
-    "mean" = mean_value,
-    "SD" = sd_value,
-    "RMS" = rms_value,
-    "CV" = cv_value,
-    "HVS" = HVS
-  )
-  x1 <- rbind(x1,x)
-}
-
-summary(x1)
