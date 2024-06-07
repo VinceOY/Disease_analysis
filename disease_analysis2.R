@@ -7,66 +7,6 @@ library(data.table)
 library(ggplot2)
 library(stringr)
 #===============================================================================
-# create table:
-# tableone example
-iris_dt <- data.table(iris)
-dt_ex <- create.table1(iris_dt,names(iris_dt)[1:4])
-
-# table1:
-dt_eye <- fread(paste0(target_folder_path,"EyeComp_clean.csv"))
-exclude_columns <- c("exclude_AGE", "exclude_ID", "exclude_Indexdate")
-dt_eye <- dt_eye[apply(dt_eye[, ..exclude_columns], 1, sum) < 1]
-names(dt_eye)
-continuous_col <- c("AGE")
-category_col <- c("SEX_TYPE", "AGE_GROUP", "Hypertension_event",      
-                  "PeripheralEnthe_event", "UnknownCauses_event", 
-                  "LipoidMetabDis_event", "AcuteURI_event", 
-                  "AbdPelvicSymptoms_event", "Dermatophytosis_event", 
-                  "GenSymptoms_event", "RespChestSymptoms_event",
-                  "HeadNeckSymptoms_event", "ContactDermEczema_event",
-                  "ViralInfection_event", "ObesityHyperal_event",   
-                  "JointDisorders_event", "AcuteBronchitis_event",
-                  "SoftTissueDis_event", "BloodExamFindings_event",
-                  "RefractionDis_event", "ConjunctivaDis_event")
-
-dt_eye[, (category_col) := lapply(.SD, as.factor), .SDcols = category_col]
-summary(dt_eye)
-tb1 <- create.table1(dt_eye, 
-                     need.col = c(continuous_col,category_col))
-csv_file_name <- paste0(target_folder_path,"table1.csv")
-fwrite(tb1, file = csv_file_name, row.names = FALSE)
-
-# tb2 / tb3
-names(result_wide)
-tb2_need_col <- c("median_value_0","median_value_1","median_value_2",
-                  "median_value_3","median_value_4","n_0","n_1","n_2","n_3",
-                  "n_4","total")
-tb2 <- create.table1(result_wide, need.col = tb2_need_col)
-csv_file_name <- paste0(target_folder_path,"table2.csv")
-fwrite(tb2, file = csv_file_name, row.names = FALSE)
-
-# tb4
-outcome_files <- list.files(target_folder_path, 
-                            pattern = paste0("_clean"), 
-                            full.names = TRUE, ignore.case = TRUE)
-tb4_result <- data.table()
-for (i in outcome_files) {
-  dt <- fread(i)
-  exclude_columns <- c("exclude_AGE", "exclude_ID", "exclude_Indexdate")
-  dt <- dt[apply(dt[, ..exclude_columns], 1, sum) < 1]
-  need_col <- c("ID", names(dt)[28:29])
-  dt <- dt[,..need_col]
-  dt <- dt[ID %in% valid_ID]
-  col_sums <- colSums(dt[,-1]) 
-  tb4_r <- data.table(t(col_sums))
-  setnames(tb4_r, c("# of event", "sum of follow up"))
-  tb4_result <- rbind(tb4_result, tb4_r)
-}
-
-csv_file_name <- paste0(target_folder_path,"table4.csv")
-fwrite(tb4_result, file = csv_file_name, row.names = FALSE)
-
-#===============================================================================
 # set parameters
 parameters <- list(
   target_folder_path = "C:/Users/USER/Downloads/disease_df/",
@@ -149,7 +89,7 @@ summary(HbA1c)
 names(HbA1c)
 #===============================================================================
 # select valid data & data summary
-select_col <- c("ID", "SEX_TYPE", "Index_date", "EyeComp_event","P_DATE", "B_DATE")
+select_col <- c("ID", "SEX_TYPE", "Index_date", "EyeComp_event","P_DATE")
 d_tmp <- HbA1c[,..select_col]
 d_tmp <- d_tmp[, followup:= as.numeric(P_DATE-as.Date(Index_date)) ]
 status_followup <- data.table(unique(d_tmp[["ID"]]))
@@ -217,10 +157,10 @@ result_wide <- dcast(result, ID ~ interval,
 result_wide[, total := rowSums((.SD),na.rm = TRUE), 
             .SDcols = paste0("n_", 0:(num_interval-1))]
 names(result_wide)
+# check data 
 test_item <- result_wide[,17:21]
 row_sum <- rowSums(test_item)
 result_wide[row_sum < 5]
-
 result_wide[is.na(result_wide$mean_value_4)]
 csv_file_name <- paste0(target_folder_path,as.character(tracking_interval), 
                         "_interval_summary.csv")
@@ -285,8 +225,8 @@ cat(" # of data:", nrow(HbA1c_w), "\n", "# of ID:",
     length(unique(HbA1c_w$ID)))
 test_dist_n <- status_followup[,-1]
 row_sum <- rowSums(test_dist_n)
-valid_ID <- status_followup[row_sum==num_interval]$ID
-HbA1c_valid_dt_w <- HbA1c_w[ID %in% valid_ID]
+valid_ID_w <- status_followup[row_sum==num_interval]$ID
+HbA1c_valid_dt_w <- HbA1c_w[ID %in% valid_ID_w]
 cat(" # of data:", nrow(HbA1c_valid_dt_w), "\n", "# of ID:", 
     length(unique(HbA1c_valid_dt_w$ID)))
 
@@ -321,9 +261,79 @@ csv_file_name <- paste0(target_folder_path,as.character(tracking_interval),
 fwrite(result_wide, file = csv_file_name, row.names = FALSE)
 na_counts <- sapply(result_wide, function(x) sum(is.na(x)))
 na_counts
+
 print(result_wide)
 names(HbA1c_w)
 names(HbA1c)
+#===============================================================================
+# create table:
+# tableone example
+iris_dt <- data.table(iris)
+dt_ex <- create.table1(iris_dt,names(iris_dt)[1:4])
+
+# table1:
+dt_eye <- fread(paste0(target_folder_path,"EyeComp_clean.csv"))
+exclude_columns <- c("exclude_AGE", "exclude_ID", "exclude_Indexdate")
+dt_eye <- dt_eye[apply(dt_eye[, ..exclude_columns], 1, sum) < 1]
+names(dt_eye)
+dt_eye[,year:= substr(dt_eye[["Index_date"]], 1, 4)]
+continuous_col <- c("AGE")
+category_col <- c("year","SEX_TYPE", "AGE_GROUP", "Hypertension_event",      
+                  "PeripheralEnthe_event", "UnknownCauses_event", 
+                  "LipoidMetabDis_event", "AcuteURI_event", 
+                  "AbdPelvicSymptoms_event", "Dermatophytosis_event", 
+                  "GenSymptoms_event", "RespChestSymptoms_event",
+                  "HeadNeckSymptoms_event", "ContactDermEczema_event",
+                  "ViralInfection_event", "ObesityHyperal_event",   
+                  "JointDisorders_event", "AcuteBronchitis_event",
+                  "SoftTissueDis_event", "BloodExamFindings_event",
+                  "RefractionDis_event", "ConjunctivaDis_event")
+
+dt_eye[, (category_col) := lapply(.SD, as.factor), .SDcols = category_col]
+summary(dt_eye)
+tb1 <- create.table1(dt_eye, 
+                     need.col = c(continuous_col,category_col))
+print(tb1)
+csv_file_name <- paste0(target_folder_path,"table1.csv")
+fwrite(tb1, file = csv_file_name, row.names = FALSE)
+
+# tb2 / tb3
+names(result_wide)
+tb2_need_col <- c("median_value_0","median_value_1","median_value_2",
+                  "median_value_3","median_value_4","n_0","n_1","n_2","n_3",
+                  "n_4","total")
+tb2 <- create.table1(result_wide, need.col = tb2_need_col)
+print(tb2)
+csv_file_name <- paste0(target_folder_path,"table2.csv")
+fwrite(tb2, file = csv_file_name, row.names = FALSE)
+
+# tb4
+outcome_files <- list.files(target_folder_path, 
+                            pattern = paste0("_clean"), 
+                            full.names = TRUE, ignore.case = TRUE)
+tb4_result <- data.table()
+for (i in outcome_files) {
+  dt <- fread(i)
+  exclude_columns <- c("exclude_AGE", "exclude_ID", "exclude_Indexdate")
+  dt <- dt[apply(dt[, ..exclude_columns], 1, sum) < 1]
+  need_col <- c("ID", names(dt)[28:29])
+  dt <- dt[,..need_col]
+  dt <- dt[ID %in% valid_ID]
+  col_sums <- colSums(dt[,-1]) 
+  tb4_r <- data.table(t(col_sums))
+  setnames(tb4_r, c("# of event", "sum of follow up"))
+  tb4_result <- rbind(tb4_result, tb4_r)
+}
+print(tb4_result)
+
+
+
+csv_file_name <- paste0(target_folder_path,"table4.csv")
+fwrite(tb4_result, file = csv_file_name, row.names = FALSE)
+
+
+
+
 #===============================================================================
 # merge w,(s,t):
 # need columns 

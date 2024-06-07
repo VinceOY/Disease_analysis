@@ -254,81 +254,60 @@ print(paste0("# of patients: ", length(dt_merge$ID)))
 
 #===============================================================================
 ## exclude: 1. ID, 2. AGE, 3. Index Date, 4. outcome date followup 
-# create exclude column
+# ID
 dt_merge[, exclude_ID := ifelse(.N > 1, 1, 0), by = ID]
+print(paste0("# of exclude id: ", length(dt_merge[dt_merge[,exclude_ID==1]]$ID)))
+
+# AGE
 dt_merge[, exclude_AGE := ifelse(AGE < 20 | AGE > 100, 1, 0)]
+print(paste0("# of exclude age: ", 
+             length(dt_merge[dt_merge[,exclude_AGE==1&
+                                        exclude_ID==0]]$ID)))
+
+# valid index date
 valid_Index_date <- min(dt_merge$Index_date)+365
 dt_merge[, exclude_Indexdate := ifelse(Index_date < valid_Index_date, 1, 0)]
-
-# 定义条件和消息列表
-conditions <- list(
-  exclude_ID = quote(exclude_ID == 1),
-  exclude_AGE = quote(exclude_AGE == 1 & exclude_ID == 0),
-  exclude_Indexdate = quote(exclude_Indexdate == 1 & exclude_ID == 0 & exclude_AGE == 0),
-  patients = quote(exclude_Indexdate == 0 & exclude_ID == 0 & exclude_AGE == 0)
-)
-
-messages <- list(
-  exclude_ID = "# of exclude ID: ",
-  exclude_AGE = "# of exclude AGE: ",
-  exclude_Indexdate = "# of not enough observe date: ",
-  patients = "# of patients: "
-)
-
-# 打印结果
-for (cond_name in names(conditions)) {
-  condition <- conditions[[cond_name]]
-  message <- messages[[cond_name]]
-  count <- length(dt_merge[eval(condition)]$ID)
-  print(paste0(message, count))
-}
-
-
-csv_file_name <- "C:/Users/USER/Downloads/disease_df/dt_merge.csv"
-fwrite(dt_merge, file = csv_file_name, row.names = FALSE)
-
+print(paste0("# of not enough observe date:  ", 
+             length(dt_merge[dt_merge[, exclude_Indexdate==1&
+                                        exclude_ID==0&
+                                        exclude_AGE==0]]$ID)))
+# step1: check # of patients 
+print(paste0("# of patients: ", 
+             length(dt_merge[dt_merge[, exclude_Indexdate==0&
+                                        exclude_ID==0&
+                                        exclude_AGE==0]]$ID)))
 # outcome date followup
 outcome_list <- list()
-condition2 <- list(
-  e1 = quote(exclude_outcome1 == 1 & exclude_ID == 0 & 
-                             exclude_AGE == 0 & exclude_Indexdate == 0 &
-                             exclude_outcome2 == 0),
-  e2 = quote(exclude_outcome2 == 1 & exclude_ID == 0 & 
-                             exclude_AGE == 0 & exclude_Indexdate == 0 &
-                             exclude_outcome1 == 0),
-  ps = quote(exclude_outcome2 == 1 & exclude_ID == 0 & 
-                     exclude_AGE == 0 & exclude_Indexdate == 0 &
-                     exclude_outcome1 == 0)
-)
-
-# define message
-messages2 <- list(
-  e1 = "# of Outcome1: ",
-  e2 = "# of Outcome2: ",
-  ps = "# of patients: "
-)
 
 for (o in outcome_diseases) {
-  i <- outcome_diseases[1]
   col <- paste0(o,"_followup")
+  dt_merge[, exclude_outcome1 := ifelse(get(col) < 0, 1, 0)]
+  dt_merge[, exclude_outcome2 := ifelse(get(col) <= 365 & get(col) >= 0, 1, 0)]
   d_tmp <- dt_merge
-  d_tmp[, exclude_outcome1 := ifelse(get(col) < 0, 1, 0)]
-  d_tmp[, exclude_outcome2 := ifelse(get(col) <= 365 & get(col) >= 0, 1, 0)]
-
   outcome_col <- c(names(d_tmp)[1:26], paste0(o,"_Date"),paste0(o,"_event"), 
                    paste0(o,"_followup"), names(d_tmp)[46:50])
   d_tmp <- d_tmp[, ..outcome_col]
-  
-  for (cond_name in names(condition2)) {
-    cond_name <- names(condition2)[1]
-    condition <- conditions2[[cond_name]]
-    message <- messages2[[cond_name]]
-    count <- length(d_tmp[eval(condition2)]$ID)
-    print(paste0(message2, count))
-  }
-
   outcome_list[[o]] <- d_tmp 
+  # ! by 條件count => by sum堤建:
+  print(paste0("# of out of range1 ", o, ": ", 
+               length(d_tmp[d_tmp[,(exclude_ID==0&
+                                      exclude_AGE==0&
+                                      exclude_Indexdate==0&
+                                      exclude_outcome1==1&
+                                      exclude_outcome2==0)]]$ID)))
+  print(paste0("# of out of range2 ", o, ": ", 
+               length(d_tmp[d_tmp[,(exclude_ID==0&
+                                      exclude_AGE==0&
+                                      exclude_Indexdate==0&
+                                      exclude_outcome1==0&
+                                      exclude_outcome2==1)]]$ID)))
+  print(paste0("# of patients: ", 
+               length(d_tmp[d_tmp[,(exclude_ID==0&
+                                      exclude_AGE==0&
+                                      exclude_Indexdate==0&
+                                      exclude_outcome1==0&
+                                      exclude_outcome2==0)]]$ID)))
+  
   csv_file_name <- paste0(target_folder_path,o,"_clean.csv")
   fwrite(d_tmp, file = csv_file_name, row.names = FALSE)
 }
-
