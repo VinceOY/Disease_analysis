@@ -250,32 +250,35 @@ for (d in outcome_diseases) {
   dt_merge[, followup := get(y) - Index_date]
   setnames(dt_merge, "followup", paste0(d,"_followup"))
 }
-print(paste0("# of patients: ", length(dt_merge$ID)))
+print(paste0("# of patients: ", length(unique(dt_merge$ID))))
+
+
 
 #===============================================================================
 ## exclude: 1. ID, 2. AGE, 3. Index Date, 4. outcome date followup 
 # ID
 dt_merge[, exclude_ID := ifelse(.N > 1, 1, 0), by = ID]
-print(paste0("# of exclude id: ", length(dt_merge[dt_merge[,exclude_ID==1]]$ID)))
+print(paste0("# of exclude id: ", 
+             length(unique(dt_merge[dt_merge[,exclude_ID==1]]$ID))))
 
 # AGE
 dt_merge[, exclude_AGE := ifelse(AGE < 20 | AGE > 100, 1, 0)]
 print(paste0("# of exclude age: ", 
-             length(dt_merge[dt_merge[,exclude_AGE==1&
-                                        exclude_ID==0]]$ID)))
+             length(unique(dt_merge[dt_merge[, exclude_AGE==1&
+                                               exclude_ID==0]]$ID))))
 
 # valid index date
 valid_Index_date <- min(dt_merge$Index_date)+365
 dt_merge[, exclude_Indexdate := ifelse(Index_date < valid_Index_date, 1, 0)]
 print(paste0("# of not enough observe date:  ", 
-             length(dt_merge[dt_merge[, exclude_Indexdate==1&
-                                        exclude_ID==0&
-                                        exclude_AGE==0]]$ID)))
+             length(unique(dt_merge[dt_merge[, exclude_Indexdate==1&
+                                               exclude_ID==0&
+                                               exclude_AGE==0]]$ID))))
 # step1: check # of patients 
 print(paste0("# of patients: ", 
-             length(dt_merge[dt_merge[, exclude_Indexdate==0&
-                                        exclude_ID==0&
-                                        exclude_AGE==0]]$ID)))
+             length(unique(dt_merge[dt_merge[, exclude_Indexdate==0&
+                                               exclude_ID==0&
+                                               exclude_AGE==0]]$ID))))
 # outcome date followup
 outcome_list <- list()
 
@@ -290,24 +293,28 @@ for (o in outcome_diseases) {
   outcome_list[[o]] <- d_tmp 
   # ! by 條件count => by sum堤建:
   print(paste0("# of out of range1 ", o, ": ", 
-               length(d_tmp[d_tmp[,(exclude_ID==0&
-                                      exclude_AGE==0&
-                                      exclude_Indexdate==0&
-                                      exclude_outcome1==1&
-                                      exclude_outcome2==0)]]$ID)))
+               length(unique(d_tmp[d_tmp[,(exclude_ID==0&
+                                             exclude_AGE==0&
+                                             exclude_Indexdate==0&
+                                             exclude_outcome1==1&
+                                             exclude_outcome2==0)]]$ID))))
   print(paste0("# of out of range2 ", o, ": ", 
-               length(d_tmp[d_tmp[,(exclude_ID==0&
-                                      exclude_AGE==0&
-                                      exclude_Indexdate==0&
-                                      exclude_outcome1==0&
-                                      exclude_outcome2==1)]]$ID)))
+               length(unique(d_tmp[d_tmp[,(exclude_ID==0&
+                                             exclude_AGE==0&
+                                             exclude_Indexdate==0&
+                                             exclude_outcome1==0&
+                                             exclude_outcome2==1)]]$ID))))
   print(paste0("# of patients: ", 
-               length(d_tmp[d_tmp[,(exclude_ID==0&
-                                      exclude_AGE==0&
-                                      exclude_Indexdate==0&
-                                      exclude_outcome1==0&
-                                      exclude_outcome2==0)]]$ID)))
+               length(unique(d_tmp[d_tmp[,(exclude_ID==0&
+                                             exclude_AGE==0&
+                                             exclude_Indexdate==0&
+                                             exclude_outcome1==0&
+                                             exclude_outcome2==0)]]$ID))))
   
   csv_file_name <- paste0(target_folder_path,o,"_clean.csv")
   fwrite(d_tmp, file = csv_file_name, row.names = FALSE)
 }
+
+print(paste0("# of patients: ", length(unique(dt_merge$ID))))
+
+length(unique(outcome_list$EyeComp$ID)) 
