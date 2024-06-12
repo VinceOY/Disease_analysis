@@ -8,6 +8,15 @@ library(ggplot2)
 library(stringr)
 #===============================================================================
 # set parameters
+# define parameters: 
+# outcome: Diabetes related outcome, 
+# Test_item: 檢驗項目
+# exclude_columns: 清除age, ID, index_date
+# target_folder_path: 檔案存放路徑
+# related_diseases: 目標疾病, outcome, control, 
+# Test_ID: 兩院R_ITEM疾病碼
+# Test_ID_w: 萬芳疾病碼
+# unit: 檢驗項目排除單位
 parameters <- list(
   outcome = "PeripheralVascDisease", 
   Test_item = "HbA1c",
@@ -22,8 +31,8 @@ parameters <- list(
                        "ObesityHyperal", "JointDisorders", "AcuteBronchitis", 
                        "SoftTissueDis", "BloodExamFindings", "RefractionDis",
                        "ConjunctivaDis"),
-  Test_ID = list(HbA1c = c("014701"), ALBUMIN = c("010301","11D101")),
-  Test_ID_w = list(HbA1c = c("F09006B"), ALBUMIN = c("F09038C")),
+  Test_ID = list(HbA1c = c("014701","F09006B"), 
+                 ALBUMIN = c("010301","11D101","F09038C")),
   unit = list(HbA1c = c("%"), ALBUMIN = c("(?i) g/dl"))
 )
 
@@ -38,10 +47,10 @@ outcome_diseases <- related_diseases[2:7]
 
 Test_item <- parameters$Test_item
 Test_ID <- parameters$Test_ID$HbA1c
-Test_ID_w <- parameters$Test_ID_w$HbA1c
 unit_p <- parameters$unit$HbA1c
 #===============================================================================
-## 檢驗結果: LAB result # OITEM unique RITEM
+# 檢驗結果: LAB result # OITEM unique RITEM
+# 兩院結果合併、select column, rename
 result_files <- c("v_labresult_t.csv", "v_labresult_s.csv")
 d_result <- data.table()
 for (file in result_files) {
@@ -53,6 +62,197 @@ d_result <- d_result[,c("CHR_NO","P_DATE","R_ITEM","VALUE"),
                      with = FALSE]
 d_result <- standardized_date(d_result, "P_DATE")
 setnames(d_result, "CHR_NO", "ID")
+setnames(d_result, "P_DATE", "Test_date")
+setnames(d_result, "R_ITEM", "Test_item")
+
+#===============================================================================
+# 檢驗結果2: v_exper_sign_w.csv 萬芳
+# 萬芳結果select column, rename
+
+result_files_w <- c("v_exper_sign_w.csv")
+d_result_w <- fread(paste0(target_folder_path, result_files_w))
+d_result_w <- d_result_w[,c("CHR_NO", "EXPER_DATE","GROUP_CODE","EXPER_DATA2"), 
+                         with = FALSE]
+d_result_w <- standardized_date(d_result_w, "EXPER_DATE")
+setnames(d_result_w,"CHR_NO","ID")
+setnames(d_result_w, "EXPER_DATE", "Test_date")
+setnames(d_result_w, "GROUP_CODE", "Test_item")
+setnames(d_result_w, "EXPER_DATA2", "VALUE")
+
+#===============================================================================
+# merge: lab results(s, w, t) and output csv
+lab_result <- rbind(d_result, d_result_w)
+csv_file_name <- paste0(target_folder_path,"lab_result_swt.csv")
+fwrite(lab_result, file = csv_file_name, row.names = FALSE)
+
+#===============================================================================
+# 從lab_result挑選出目標疾病
+dt_test <- lab_result[grepl(paste0("^", paste(Test_ID, collapse="|^")), 
+                            Test_item)]
+
+csv_file_name <- paste0(target_folder_path,"HbA1c_result_swt.csv")
+fwrite(dt_test, file = csv_file_name, row.names = FALSE)
+
+#===============================================================================
+# clean data
+dt_test <- fread(paste0(target_folder_path,"HbA1c_result_swt.csv"))
+dt_test <- dt_test[, `:=`(clean_value = str_replace_all(VALUE, unit_p, ""), 
+                          unit = unit_p)]
+dt_test <- dt_test[, outliers := ifelse(grepl("[><]", clean_value), 1, 0)]
+cat(" # of outliers:",nrow(dt_test[dt_test[,outliers==1]]))
+dt_test <- dt_test[outliers==0]
+
+dt_test <- dt_test[, numeric_value := as.numeric(clean_value)]
+dt_test <- dt_test[!is.na(dt_test$numeric_value)] # drop NA
+summary(dt_test) 
+
+#===============================================================================
+# merge dt_test, 糖尿病, outcome by ID 
+dt_outcome <- fread(paste0(target_folder_path,outcome_file))
+# 定義 exclude columns
+dt_outcome <- dt_outcome[apply(dt_outcome[, ..exclude_columns], 1, sum) < 1]
+dt_test_T <- merge(dt_outcome, dt_test, by = "ID", all.x = TRUE) 
+dt_test_T <- dt_test_T[!is.na(Test_date)]
+
+#===============================================================================
+# select valid data & data summary
+select_col <- c("ID", "Index_date", "Test_date")
+d_tmp <- dt_test_T[,..select_col]
+d_tmp <- d_tmp[, followup:= as.numeric(Test_date-Index_date) ]
+status_followup <- data.table(unique(d_tmp[["ID"]]))
+setnames(status_followup, "V1", "ID")
+
+num_interval <- 5
+tracking_interval <- 90
+event_interval <- 45
+for (m in 0:(num_interval-1)) {
+  lower <- m * tracking_interval - event_interval + 1
+  upper <- m * tracking_interval + event_interval
+  d_tmp[, event := as.integer(followup >= lower & followup <= upper)]
+  dt <- d_tmp[, .(event = as.integer( any(event == 1)) ), by = ID] 
+  cat("coverage_ratio:", (sum(dt$event)/nrow(dt)),"\n" ) 
+  setnames(dt, "event", paste0("m_", m))
+  status_followup <- merge(status_followup, dt, by = "ID")
+}
+
+# valid ID: by rowsum = num_interval
+test_dist_n <- status_followup[,-1]
+row_sum <- rowSums(test_dist_n)
+valid_ID <- status_followup[row_sum==num_interval]$ID
+
+csv_file_name <- paste0(target_folder_path,Test_item,"_valid_ID.csv")
+fwrite(as.data.table(valid_ID), file = csv_file_name, row.names = FALSE)
+
+#===============================================================================
+# get valid id data
+create_intervals <- function(values, num_interval, tracking_interval, event_interval) {
+  intervals <- rep(NA, length(values))
+  for (m in 0:(num_interval-1)) {
+    lower <- m * tracking_interval - event_interval + 1
+    upper <- m * tracking_interval + event_interval
+    intervals[values >= lower & values <= upper] <- paste(m)
+  }
+  return(intervals)
+}
+
+dt_test_valid_dt <- dt_test_T[ID %in% valid_ID]
+cat(" # of data:", nrow(dt_test_valid_dt), "\n", "# of ID:", 
+    length(unique(dt_test_valid_dt$ID)))
+
+# valid data: 
+select_col <- c("ID", "Index_date", "Test_date", "numeric_value","unit")
+dt_test_valid_dt <- dt_test_valid_dt[,..select_col]
+dt_test_valid_dt <- dt_test_valid_dt[, followup:= 
+                                       as.numeric(Test_date-Index_date)]
+
+
+dt_test_valid_dt[, interval := create_intervals(dt_test_valid_dt$followup, 
+                                                 num_interval, tracking_interval,
+                                                 event_interval)]
+dt_test_valid_dt <- dt_test_valid_dt[!is.na(intervals)]
+
+# cal mean, median , sd by ID, season
+result <- dt_test_valid_dt[, .(
+  mean_value = mean(numeric_value, na.rm = TRUE),
+  median_value = median(numeric_value, na.rm = TRUE),
+  sd_value = sd(numeric_value, na.rm = TRUE),
+  n = .N
+), by = .(ID, interval)]
+
+result_wide <- dcast(result, ID ~ interval, 
+                     value.var = c("mean_value", "median_value", "sd_value", 
+                                   "n"))
+result_wide[, total := rowSums((.SD),na.rm = TRUE), 
+            .SDcols = paste0("n_", 0:(num_interval-1))]
+names(result_wide)
+
+#===============================================================================
+# table1: outcome: eye / exclude basic / age / index date
+dt_outcome[,year:= format(dt_outcome$Index_date, "%Y")] 
+continuous_col <- c("AGE")
+category_col <- c("year","SEX_TYPE", "AGE_GROUP", "Hypertension_event",      
+                  "PeripheralEnthe_event", "UnknownCauses_event", 
+                  "LipoidMetabDis_event", "AcuteURI_event", 
+                  "AbdPelvicSymptoms_event", "Dermatophytosis_event", 
+                  "GenSymptoms_event", "RespChestSymptoms_event",
+                  "HeadNeckSymptoms_event", "ContactDermEczema_event",
+                  "ViralInfection_event", "ObesityHyperal_event",   
+                  "JointDisorders_event", "AcuteBronchitis_event",
+                  "SoftTissueDis_event", "BloodExamFindings_event",
+                  "RefractionDis_event", "ConjunctivaDis_event")
+
+dt_outcome[, (category_col) := lapply(.SD, as.factor), .SDcols = category_col]
+summary(dt_outcome)
+tb1 <- create.table1(dt_outcome, 
+                     need.col = c(continuous_col,category_col))
+print(tb1)
+csv_file_name <- paste0(target_folder_path,"table1_basic.csv") # excel 
+fwrite(tb1, file = csv_file_name, row.names = FALSE)
+
+#===============================================================================
+# table2: outcome follow up summary
+names(result_wide)
+tb2_need_col <- c("median_value_0","median_value_1","median_value_2",
+                  "median_value_3","median_value_4","n_0","n_1","n_2","n_3",
+                  "n_4","total")
+tb2 <- create.table1(result_wide, need.col = tb2_need_col)
+print(tb2)
+csv_file_name <- paste0(target_folder_path, outcome,"_", 
+                        Test_item, "_table2123.csv")
+fwrite(tb2, file = csv_file_name, row.names = FALSE)
+
+#===============================================================================
+# clean values
+dt_test <- dt_test[, `:=`(clean_value = str_replace_all(VALUE, unit_p, ""), 
+                          unit = unit_p)]
+dt_test <- dt_test[, outliers := ifelse(grepl("[><]", clean_value), 1, 0)]
+cat(" # of outliers:",nrow(dt_test[dt_test[,outliers==1]]))
+
+dt_test <- dt_test[dt_test[,outliers==0]]
+cat(" # of data:", nrow(dt_test), "\n", "# of ID:", length(unique(dt_test$ID)))
+
+dt_test <- dt_test[, numeric_value := as.numeric(clean_value)]
+dt_test[is.na(dt_test$numeric_value)]
+dt_test <- dt_test[!is.na(dt_test$numeric_value)]
+summary(dt_test) 
+
+dt_test[, R_ITEM := Test_item]
+setnames(dt_test, "R_ITEM", "Test_item")
+setnames(dt_test, "P_DATE", "Test_date")
+head(dt_test)
+
+
+#===============================================================================
+# merge: diabetes people,  lab_result
+dt_outcome <- fread(paste0(target_folder_path,outcome_file))
+
+# 定義 exclude columns
+dt_outcome <- dt_outcome[apply(dt_outcome[, ..exclude_columns], 1, sum) < 1]
+dt_diabete <- merge(dt_outcome, d_result, by = "ID", all.x = TRUE) 
+unique(dt_diabete[!is.na(Test_date)]$ID) # N: 糖尿病患者
+# 
+
+
 
 #===============================================================================
 # 檢驗代號: EXP ITEM 
@@ -64,16 +264,6 @@ for (file in item_files) {
 }
 d_item <- d_item[,c("O_ITEM", "R_ITEM","R_ITEM_NAME"), with = FALSE]
 
-#HbA1c_dt <- d_item[grep("HbA1c", R_ITEM_NAME, ignore.case = TRUE)]
-#HbA1c_ID <- unique(HbA1c_dt[["R_ITEM"]])
-#===============================================================================
-# merge id, item name, count 
-dt_outcome <- fread(paste0(target_folder_path,outcome_file))
-length(dt_outcome$ID)
-
-# 定義 exclude columns
-dt_outcome <- dt_outcome[apply(dt_outcome[, ..exclude_columns], 1, sum) < 1]
-dt_diabete <- merge(dt_outcome, d_result, by = "ID", all.x = TRUE) 
 
 #===============================================================================
 # Test_item
@@ -142,7 +332,7 @@ setnames(dt_test_w, "EXPER_DATA2", "VALUE")
 names(dt_test_w) == names(dt_test)
 
 #===============================================================================
-# merge two dts 
+# merge two dts => HbA1c
 head(dt_test)
 head(dt_test_w)
 dt_test_T <- rbind(dt_test, dt_test_w)
@@ -157,14 +347,20 @@ d_tmp <- dt_test_T[,..select_col]
 d_tmp <- d_tmp[, followup:= as.numeric(Test_date-as.Date(Index_date)) ]
 status_followup <- data.table(unique(d_tmp[["ID"]]))
 setnames(status_followup, "V1", "ID")
+
+
+i <- seq(0, 360, 90)
 num_interval <- 5
 tracking_interval <- 90
 event_interval <- 45
 for (m in 0:(num_interval-1)) {
   lower <- m * tracking_interval - event_interval + 1
   upper <- m * tracking_interval + event_interval
+  
   d_tmp[, event := as.integer(followup >= lower & followup <= upper)]
-  dt <- d_tmp[, .(event = as.integer(any(event == 1))), by = ID]
+  
+  dt <- d_tmp[, .(event = as.integer( any(event == 1)) ), by = ID] # by id 看發生與否
+  
   cat("coverage_ratio:", (sum(dt$event)/nrow(dt)),"\n" ) 
   setnames(dt, "event", paste0("m_", m))
   status_followup <- merge(status_followup, dt, by = "ID")
@@ -175,6 +371,7 @@ test_dist_n <- status_followup[,-1]
 row_sum <- rowSums(test_dist_n)
 valid_ID <- status_followup[row_sum==num_interval]$ID
 
+#===============================================================================
 dt_test_valid_dt <- dt_test_T[ID %in% valid_ID]
 cat(" # of data:", nrow(dt_test_valid_dt), "\n", "# of ID:", 
     length(unique(dt_test_valid_dt$ID)))
@@ -232,8 +429,8 @@ na_counts <- sapply(result_wide, function(x) sum(is.na(x)))
 na_counts
 
 #===============================================================================
-# table1: outcome: eye / exclude basic / age / index date
-dt_outcome[,year:= substr(dt_outcome[["Index_date"]], 1, 4)]
+# table1: outcome: eye / exclude basic / age / index date: all data 
+dt_outcome[,year:= substr(dt_outcome[["Index_date"]], 1, 4)] # year 
 continuous_col <- c("AGE")
 category_col <- c("year","SEX_TYPE", "AGE_GROUP", "Hypertension_event",      
                   "PeripheralEnthe_event", "UnknownCauses_event", 
@@ -251,12 +448,11 @@ summary(dt_outcome)
 tb1 <- create.table1(dt_outcome, 
                      need.col = c(continuous_col,category_col))
 print(tb1)
-csv_file_name <- paste0(target_folder_path,"table1_basic.csv")
+csv_file_name <- paste0(target_folder_path,"table1_basic.csv") # excel 
 fwrite(tb1, file = csv_file_name, row.names = FALSE)
 
 #===============================================================================
-# table2: outcome follow up summary
-names(result_wide)
+# table2: outcome follow up summary: # of test items
 tb2_need_col <- c("median_value_0","median_value_1","median_value_2",
                   "median_value_3","median_value_4","n_0","n_1","n_2","n_3",
                   "n_4","total")
@@ -267,7 +463,23 @@ csv_file_name <- paste0(target_folder_path, outcome,"_",
 fwrite(tb2, file = csv_file_name, row.names = FALSE)
 
 #===============================================================================
-# table4
+# table3: # of test item and outcomes 
+data <- c()
+
+# lab
+ex_1.1
+ex_1.2
+
+
+for(d in c()){
+  by d 
+  ex1
+  ex1
+  dt[, exclude_valid_ID := ifelse(ID %in% valid_ID, 0, 1)]
+  fwrite
+  
+}
+
 dt <- fread(paste0(target_folder_path,outcome_file))
 dt[, exclude_valid_ID := ifelse(ID %in% valid_ID, 0, 1)]
 cat("# of invalid ID:", length(unique(dt[dt[,exclude_Indexdate==0&
