@@ -1,0 +1,71 @@
+R: get.R
+#=================================================================
+output: 
+
+R: lab_result_combine.R
+#=================================================================
+input:
+output: clean_people_lab.csv 最終人選的檢驗資料(含基本資料) * 12 files (test+outcome)
+
+
+R: create_table.R
+#=================================================================
+output: 
+Table1: 
+所有糖尿病患者的基本資料摘要
+Table2: 
+index date一年內4季皆有定期檢驗test_item的糖尿病患者中test_item檢驗值的統計值 
+Table3:  
+目標病患在各test_items對應到各outcome總數量、發病數量以及總追蹤時間
+
+
+6 outcome result: 
+input_x: [basic_col(Age_group, Index_date, Index_year, Sex_type, control_diseases*11), baseline_mean, 
+	  Q1~Q4(test_item_mean), 
+          Q1~Q4(sd or cv or rms)]
+output_y: [outcome(1,0)]
+
+model: 3 inputs / 6 outcomes / 2 test items: 36 model results 
+need_files: basic.csv + lab.csv
+
+table:[test_item, outcome, model, var, HR, CI]
+
+parameters = list(test_item = c("HbA1c", "ALBUMIN"),
+		  outcome = c("EyeComp", "CardioDisease", "CerebroDisease", 
+		              "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro"),
+		  input_comb = list(a = c(mean, sd), b = c(mean, cv), c = c(mean,rms) )
+)
+
+R: cox_model_result.R
+#=================================================================
+# cal mean by ppl 
+# input: clean_people_lab.csv 最終人選的檢驗資料(含基本資料) * 12 files (test+outcome)
+for(f in files){
+ dt <- read(f)  
+ for(n in ID){
+  cal(Q0~Q4(test_item_mean))
+ }
+ csv_file_name
+ fwrite()
+}
+# output: input_x包含Q1~Q4(test_item: mean、sd、cv、rms)歸人(N) * 12 files (test_outcome_dtf)
+
+#=================================================================
+# build model table: 
+model_result <- data.table(test_item = c(), outcome = c(), var = c(), HR = c(), CI = c())
+for(t in test){
+ for(o in outcomes){
+  dt <- fread(output)
+  for(i in inputs){
+   select_col <- i
+   d_tmp <- dt[,.select_col]
+   x <- input_x
+   y <- input_y
+   build model	
+   model_tmp <- model summary[,c(var、HR、CI)]
+   model_tmp[, test_item := t]
+   model_tmp[, outcome := output_y]
+   model_result <- rbind(model_result, model_tmp)
+  }
+ }
+}
