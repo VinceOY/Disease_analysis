@@ -7,7 +7,6 @@
 
 ```
 Disease_analysis/
-|
 ├── get.R 
 ├── lab_result_combine.R
 ├── create_table.R
