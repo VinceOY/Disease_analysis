@@ -19,7 +19,7 @@ library(stringr)
 # unit: 檢驗項目排除單位
 parameters <- list(
   outcome = "PeripheralVascDisease", 
-  Test_item = "HbA1c",
+  Test_item = "ALBUMIN",
   exclude_columns = c("exclude_AGE", "exclude_ID", "exclude_Indexdate"),
   target_folder_path = "C:/Users/USER/Downloads/disease_df/",
   related_diseases = c("Diabete","EyeComp", "CardioDisease", "CerebroDisease", 
@@ -46,8 +46,8 @@ target_disease <- related_diseases[1]
 outcome_diseases <- related_diseases[2:7]
 
 Test_item <- parameters$Test_item
-Test_ID <- parameters$Test_ID$HbA1c
-unit_p <- parameters$unit$HbA1c
+Test_ID <- parameters$Test_ID$ALBUMIN
+unit_p <- parameters$unit$ALBUMIN
 #===============================================================================
 # 檢驗結果: LAB result # OITEM unique RITEM
 # 兩院結果合併、select column, rename
@@ -87,10 +87,12 @@ fwrite(lab_result, file = csv_file_name, row.names = FALSE)
 
 #===============================================================================
 # 從lab_result挑選出目標疾病
+lab_result <- fread(paste0(target_folder_path,"lab_result_swt.csv"))
+
 dt_test <- lab_result[grepl(paste0("^", paste(Test_ID, collapse="|^")), 
                             Test_item)]
 
-csv_file_name <- paste0(target_folder_path,"HbA1c_result_swt.csv")
+csv_file_name <- paste0(target_folder_path,"ALBUMIN_result_swt.csv")
 fwrite(dt_test, file = csv_file_name, row.names = FALSE)
 
 #===============================================================================

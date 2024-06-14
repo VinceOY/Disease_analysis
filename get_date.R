@@ -10,8 +10,8 @@ library(ggplot2)
 ## get disease code list
 folder_path2 = "C:/Users/USER/Downloads/TMUCRD_2021_csv/"
 dt1 <- fread(paste0(folder_path2, "ICD92ICD10.csv"))
-dt1 <- dt1[, c("ICD-9-CM代碼" ,"ICD-10-CM"),with = FALSE]
-setnames(dt1, "ICD-9-CM代碼", "ICD9")
+dt1 <- dt1[, c("ICD-9" ,"ICD-10-CM"),with = FALSE]
+setnames(dt1, "ICD-9", "ICD9")
 setnames(dt1, "ICD-10-CM", "ICD10")
 ICD9_codes = list(EyeComp = c("362.01","362.02","362.55", "362.11",
                               "365.44","369","361","369.60"),
@@ -129,7 +129,7 @@ for (data_set_name in names(parameters$data_sets)) {
 
 #===============================================================================
 # dt_basic: ["ID", "SEX_TYPE", "BIRTH_DATE", "DEATH_DATE" ]
-# data source:  病人資料_CHR_basic
+# data source:  gd::h3f_CHR_basic
 dt_basic <- data.table()
 for (file in basic_files) {
   d_tmp <- fread(paste0(folder_path, file))
@@ -291,7 +291,7 @@ for (o in outcome_diseases) {
                    paste0(o,"_followup"), names(d_tmp)[46:50])
   d_tmp <- d_tmp[, ..outcome_col]
   outcome_list[[o]] <- d_tmp 
-  # ! by 條件count => by sum堤建:
+  # ! by f"d;6count => by sume $e;::
   print(paste0("# of out of range1 ", o, ": ", 
                length(unique(d_tmp[d_tmp[,(exclude_ID==0&
                                              exclude_AGE==0&
