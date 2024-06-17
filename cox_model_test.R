@@ -132,10 +132,11 @@ for(o in outcome){
       
       # Extract relevant information for the table
       var <- names(cox_model$coefficients)
-      HR <- exp(cox_model$coefficients)  # Hazard ratios
+      HR <- round(exp(cox_model$coefficients),3)  # Hazard ratios
       CI <- list()
       for (i in 1:length(summary_cox$conf.int[,1])) {
-        CI[[i]] <- c(summary_cox$conf.int[i, 3], summary_cox$conf.int[i, 4])  
+        CI[[i]] <- c(round(summary_cox$conf.int[i, 3], 3), 
+                     round(summary_cox$conf.int[i, 4], 3))  
       }
       p_value <- summary_cox$coefficients[, 5]  # p-value
       significance <- ifelse(p_value < 0.001, "***", 
