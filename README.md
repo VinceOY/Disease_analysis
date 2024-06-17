@@ -7,7 +7,12 @@
 
 ```
 Disease_analysis/
-├── get.R 
+├── tool_function/
+|   |── tableone.R
+|   |── standard_function.R  
+|   |── fetch_function.R
+|   └── documentation.md
+├── get_data.R 
 ├── lab_result_combine.R
 ├── create_table.R
 ├── cox_model_result.R
@@ -37,5 +42,5 @@ Disease_analysis/
 
 - cox_model_result.R: ToDo
   - 目的: 2個檢驗項目, 3種變數組合, 6個併發症用cox model進行建模&分析 
-    - input_table: test_outcome.csv
+    - input_table: test_outcome.csv * 12
     - output_table: 36種模型結果整合 (model_result.csv)

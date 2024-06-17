@@ -23,15 +23,24 @@ ICD9_codes = list(EyeComp = c("362.01","362.02","362.55", "362.11",
                                             "440.22","440.23","440.24"),
                   Nephropathy = c("583", "585", "V451"),
                   DiabeticNeuro = c("357.2","337.1","353"),
-                  Hypertension = "401", PeripheralEnthe = "726",
-                  UnknownCauses = "799", LipoidMetabDis = "272", 
-                  AcuteURI = "465", AbdPelvicSymptoms = c("724","789"),
-                  Dermatophytosis = "110", GenSymptoms = "780",
-                  RespChestSymptoms = "786", HeadNeckSymptoms = "784",
-                  ContactDermEczema = "692", ViralInfection = "79",
-                  ObesityHyperal = "278", JointDisorders = "719",
-                  AcuteBronchitis = "466", SoftTissueDis = "729",
-                  BloodExamFindings = "790", RefractionDis = "367",
+                  Hypertension = "401", 
+                  PeripheralEnthe = "726",
+                  UnknownCauses = "799", 
+                  LipoidMetabDis = "272", 
+                  AcuteURI = "465", 
+                  AbdPelvicSymptoms = c("724","789"),
+                  Dermatophytosis = "110", 
+                  GenSymptoms = "780",
+                  RespChestSymptoms = "786", 
+                  HeadNeckSymptoms = "784",
+                  ContactDermEczema = "692", 
+                  ViralInfection = "79",
+                  ObesityHyperal = "278", 
+                  JointDisorders = "719",
+                  AcuteBronchitis = "466", 
+                  SoftTissueDis = "729",
+                  BloodExamFindings = "790", 
+                  RefractionDis = "367",
                   ConjunctivaDis = "372"
 )
 
@@ -54,6 +63,8 @@ disease_code_list[["diabete"]] <- c(unique(d_tmp$ICD9), unique(d_tmp$ICD10))
 
 #===============================================================================
 # set parameters
+# parameter修改(target_disease、related_diseases) 分成 可調整(k 跟疾病)和固定(opd, ipd) 
+# 路徑: 分folder by 目的 路徑不要放參數
 parameters <- list(
   basic_files = c("v_chr_basic_w.csv","v_chr_basic_t.csv","v_chr_basic_s.csv"),
   ori_folder_path = "C:/Users/USER/Downloads/TMUCRD_2021_csv/",
@@ -68,7 +79,7 @@ parameters <- list(
                         "ObesityHyperal", "JointDisorders", "AcuteBronchitis", 
                         "SoftTissueDis", "BloodExamFindings", "RefractionDis",
                         "ConjunctivaDis"),
-  disease_codes = disease_code_list,
+  disease_codes = disease_code_list, # read
   data_sets = list(
     opd = list(
       file_list = c("v_opd_basic_w.csv","v_opd_basic_t.csv",
@@ -78,7 +89,7 @@ parameters <- list(
                           "ICD10_CODE4", "ICD10_CODE5"),
       id_col = "CHR_NO",
       date_col = "OPD_DATE",
-      k = 3
+      k = 3 # follow disease
     ),
     ipd = list(
       file_list = c("v_ipd_basic_w.csv","v_ipd_basic_t.csv",
@@ -105,6 +116,8 @@ taget_outcome_diseases <- c(target_disease, outcome_diseases)
 
 #===============================================================================
 # get data
+# k = 
+# data_set_name <- names(parameters$data_sets)[1]
 for (data_set_name in names(parameters$data_sets)) {
   data_set <- parameters$data_sets[[data_set_name]]
   dt_file_list <- data_set$file_list
@@ -141,8 +154,11 @@ cols_to_pad <- c("BIRTH_DATE", "DEATH_DATE")
 dt_basic <- standardized_date(dt_basic, "BIRTH_DATE")
 dt_basic <- standardized_date(dt_basic, "DEATH_DATE") 
 setnames(dt_basic, "CHR_NO", "ID")
+# end
+
 
 #===============================================================================
+# merge table
 # disease_list: [tb1,tb2,tb3,...]
 # tb_disease = [ID, DATE]
 disease_list <- list()
@@ -180,7 +196,7 @@ for (d in taget_outcome_diseases) {
 
 dt_target <- disease_list$Diabete
 setnames(dt_target , "Date", "Index_date")
-
+# output
 #===============================================================================
 # Merge tables
 # step1: merge basic, index_date by CHR_NO and cal age / sep age group 
@@ -226,6 +242,8 @@ for (c in control_diseases) {
 
 #===============================================================================
 # merge basic, index_date, control disease, Outcomes  
+# 合併整段
+outcome_diseases
 for (d in outcome_diseases) {
   outcome <- disease_list[[d]]
   dt_merge <- merge(dt_merge, outcome , by = "ID", all.x = TRUE)
@@ -233,8 +251,9 @@ for (d in outcome_diseases) {
   setnames(dt_merge, "event", paste0(d,"_event"))
   setnames(dt_merge, "Date", paste0(d,"_Date"))
 }
+head(dt_merge)
 
-# fill NA
+# fill NA 可以往上合併
 dt_merge[ ,end_date := DEATH_DATE]
 date_cols <- names(dt_merge)[sapply(dt_merge, is.date)]
 max_dates <- lapply(dt_merge[, ..date_cols], max, na.rm = TRUE)
@@ -256,6 +275,7 @@ print(paste0("# of patients: ", length(unique(dt_merge$ID))))
 
 #===============================================================================
 ## exclude: 1. ID, 2. AGE, 3. Index Date, 4. outcome date followup 
+# basic 順序、exclude 修改
 # ID
 dt_merge[, exclude_ID := ifelse(.N > 1, 1, 0), by = ID]
 print(paste0("# of exclude id: ", 
@@ -267,14 +287,15 @@ print(paste0("# of exclude age: ",
              length(unique(dt_merge[dt_merge[, exclude_AGE==1&
                                                exclude_ID==0]]$ID))))
 
-# valid index date
-valid_Index_date <- min(dt_merge$Index_date)+365
+# valid index date # by year 判斷
+valid_Index_date <- min(dt_merge$Index_date)+365 
 dt_merge[, exclude_Indexdate := ifelse(Index_date < valid_Index_date, 1, 0)]
 print(paste0("# of not enough observe date:  ", 
              length(unique(dt_merge[dt_merge[, exclude_Indexdate==1&
                                                exclude_ID==0&
                                                exclude_AGE==0]]$ID))))
 # step1: check # of patients 
+# clean_df
 print(paste0("# of patients: ", 
              length(unique(dt_merge[dt_merge[, exclude_Indexdate==0&
                                                exclude_ID==0&
@@ -287,6 +308,7 @@ for (o in outcome_diseases) {
   dt_merge[, exclude_outcome1 := ifelse(get(col) < 0, 1, 0)]
   dt_merge[, exclude_outcome2 := ifelse(get(col) <= 365 & get(col) >= 0, 1, 0)]
   d_tmp <- dt_merge
+  # setname
   outcome_col <- c(names(d_tmp)[1:26], paste0(o,"_Date"),paste0(o,"_event"), 
                    paste0(o,"_followup"), names(d_tmp)[46:50])
   d_tmp <- d_tmp[, ..outcome_col]

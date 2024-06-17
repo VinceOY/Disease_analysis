@@ -7,7 +7,6 @@ R: lab_result_combine.R
 input:
 output: clean_people_lab.csv 最終人選的檢驗資料(含基本資料) * 12 files (test+outcome)
 
-
 R: create_table.R
 #=================================================================
 output: 

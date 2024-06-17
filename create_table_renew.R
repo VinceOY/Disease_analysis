@@ -28,7 +28,6 @@ outcome_file <- paste0(outcome[1],"_clean.csv") # for table1 & table2
 
 #===============================================================================
 # create table1
-outcome_file <- paste0(outcome[1],"_clean.csv")
 dt_outcome <- fread(paste0(target_folder_path, outcome_file))
 # exclude AGE
 exclude_columns = c("exclude_AGE", "exclude_ID", "exclude_Indexdate")
@@ -52,7 +51,8 @@ csv_file_name <- paste0(target_folder_path,"table1_basic.csv") # excel
 fwrite(tb1, file = csv_file_name, row.names = FALSE)
 
 #===============================================================================
-# create table2
+# create table2:
+# 2個斷點、3個for loop
 # input: lab_result_swt.csv, outcome_clean(any outcome files)
 create_intervals <- function(values, num_interval, tracking_interval, event_interval) {
   intervals <- rep(NA, length(values))
@@ -66,7 +66,9 @@ create_intervals <- function(values, num_interval, tracking_interval, event_inte
 
 file_name <- paste0(target_folder_path,"lab_result_swt.csv")
 dt_lab <- fread(file_name)
+# add NA columns
 for (t in names(Test_item)) {
+  t <- names(Test_item)[1]
   Test_ID <- Test_item[[t]]$ID
   unit_p <- Test_item[[t]]$unit
   
@@ -80,7 +82,11 @@ for (t in names(Test_item)) {
   dt_test <- dt_test[outliers==0]
   
   dt_test <- dt_test[, numeric_value := as.numeric(clean_value)]
+  dt_test[is.na(dt_test$numeric_value)]
+  #dt_test <- dt_test[is.na(dt_test$numeric_value)]
   dt_test <- dt_test[!is.na(dt_test$numeric_value)] # drop NA
+  
+  # output: +斷點
   
   # merge dt_test, 糖尿病, outcome by ID 
   dt_outcome <- fread(paste0(target_folder_path,outcome_file))
@@ -97,6 +103,7 @@ for (t in names(Test_item)) {
   status_followup <- data.table(unique(d_tmp[["ID"]]))
   setnames(status_followup, "V1", "ID")
   
+  # seq
   num_interval <- 5
   tracking_interval <- 90
   event_interval <- 45
@@ -111,13 +118,13 @@ for (t in names(Test_item)) {
   }
   
   # valid ID: by rowsum = num_interval
-  test_dist_n <- status_followup[,-1]
-  row_sum <- rowSums(test_dist_n)
+  row_sum <- rowSums(status_followup[,-1])
   valid_ID <- status_followup[row_sum==num_interval]$ID
   
   csv_file_name <- paste0(target_folder_path, t,"_valid_ID.csv")
   fwrite(as.data.table(valid_ID), file = csv_file_name, row.names = FALSE)
-
+  
+#===============================================================================
   # get valid id data  
   dt_valid_test <- dt_test_T[ID %in% valid_ID]
   # valid data: 
@@ -152,8 +159,12 @@ for (t in names(Test_item)) {
   csv_file_name <- paste0(target_folder_path, t, "_table2.csv")
   fwrite(tb2, file = csv_file_name, row.names = FALSE)
 }
+
+
+
 #===============================================================================
 # create table3
+# output斷點出來
 # input: get valid id data  
 tb3_T <- data.table()
 for (t in names(Test_item)) {
@@ -163,6 +174,7 @@ for (t in names(Test_item)) {
   tb3 <- data.table()
   for (f in outcome) {
     # 6 outcomes
+    ###################
     outcome_file <- paste0(f,"_clean.csv")
     dt <- fread(paste0(target_folder_path,outcome_file))
     dt[, exclude_valid_ID := ifelse(ID %in% dt_valid_id$valid_ID, 0, 1)]
@@ -171,14 +183,22 @@ for (t in names(Test_item)) {
     exclude_columns2 <- c(exclude_columns, "exclude_outcome1", 
                           "exclude_outcome2", "exclude_valid_ID")
     dt <- dt[apply(dt[, ..exclude_columns2], 1, sum) < 1]
+    # dt[,.(sum())]
+    #===================
     Total_people <- length(unique(dt$ID))
-    need_col <- c("ID", names(dt)[28:29])
+    need_col <- c("ID", names(dt)[28:29]) # followup 
+    
+    ####################
     dt <- dt[,..need_col]
     col_sums <- colSums(dt[,-1])
-    
     tb3_r <- data.table(outcome_test = paste0(f,"_",t), t(col_sums), 
                         N = Total_people)
+    ####################
+    
+    
     setnames(tb3_r, c("outcome_test","# of event", "sum of follow up", "N"))
+    
+    
     tb3 <- rbind(tb3, tb3_r)
   }
   tb3_T <- rbind(tb3_T,tb3)
