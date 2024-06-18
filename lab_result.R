@@ -1,15 +1,13 @@
 rm(list=ls());gc()
-new_dir <- "C:/Users/USER/Downloads/function_tool/"
-setwd(new_dir)
 source("tool_function/standard_function.R")
 library(data.table)
 library(stringr)
 #===============================================================================
 # define parameters: 
-# target_folder_path: 檔案存放路徑
-# related_diseases: 目標疾病, outcome, control, 
+# related_diseases: 目標疾病, outcome, control 
 parameters <- list(
-  target_folder_path = "C:/Users/USER/Downloads/disease_df/",
+  input_path = "C:/Users/USER/Downloads/proj_data/step4/",
+  output_path = "C:/Users/USER/Downloads/proj_data/step5/",
   related_diseases = c("Diabete","EyeComp", "CardioDisease", "CerebroDisease", 
                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro",
                        "Hypertension","PeripheralEnthe","UnknownCauses",
@@ -20,7 +18,8 @@ parameters <- list(
                        "SoftTissueDis", "BloodExamFindings", "RefractionDis",
                        "ConjunctivaDis")
 )
-target_folder_path <- parameters$target_folder_path
+input_path <- parameters$input_path
+output_path <- parameters$output_path
 related_diseases <- parameters$related_diseases
 #===============================================================================
 # 檢驗結果: LAB result 
@@ -28,10 +27,13 @@ related_diseases <- parameters$related_diseases
 result_files <- c("v_labresult_t.csv", "v_labresult_s.csv")
 d_result <- data.table()
 for (file in result_files) {
-  d_tmp <- fread(paste0(target_folder_path, file))
+  hospital_names <- gsub(".*_(.*)\\.csv", "\\1", file)
+  d_tmp <- fread(paste0(input_path, file))
+  d_tmp[,hospital:= hospital_names]
   d_result <- rbind(d_result, d_tmp)
 }
-d_result <- d_result[,c("CHR_NO","P_DATE","R_ITEM","VALUE"), with = FALSE]
+d_result <- d_result[,c("CHR_NO", "hospital","P_DATE","R_ITEM","VALUE"), 
+                     with = FALSE]
 d_result <- standardized_date(d_result, "P_DATE")
 setnames(d_result, "CHR_NO", "ID")
 setnames(d_result, "P_DATE", "Test_date")
@@ -40,11 +42,10 @@ setnames(d_result, "R_ITEM", "Test_item")
 #===============================================================================
 # 檢驗結果2: v_exper_sign_w.csv 萬芳
 # 萬芳結果select column, rename
-
-result_files_w <- c("v_exper_sign_w.csv")
-d_result_w <- fread(paste0(target_folder_path, result_files_w))
-d_result_w <- d_result_w[,c("CHR_NO", "EXPER_DATE","GROUP_CODE","EXPER_DATA2"), 
-                         with = FALSE]
+d_result_w <- fread(paste0(input_path, "v_exper_sign_w.csv"))
+d_result_w[,hospital:= "w"]
+d_result_w <- d_result_w[,c("CHR_NO", "hospital","EXPER_DATE","GROUP_CODE",
+                            "EXPER_DATA2"), with = FALSE]
 d_result_w <- standardized_date(d_result_w, "EXPER_DATE")
 setnames(d_result_w,"CHR_NO","ID")
 setnames(d_result_w, "EXPER_DATE", "Test_date")
@@ -54,5 +55,5 @@ setnames(d_result_w, "EXPER_DATA2", "VALUE")
 #===============================================================================
 # merge: lab results(s, w, t) and output csv
 lab_result <- rbind(d_result, d_result_w)
-csv_file_name <- paste0(target_folder_path,"lab_result_swt.csv")
+csv_file_name <- paste0(output_path,"lab_result_swt.csv")
 fwrite(lab_result, file = csv_file_name, row.names = FALSE)

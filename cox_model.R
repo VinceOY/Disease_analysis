@@ -37,33 +37,40 @@ file_list <- list.files(path = target_folder_path)
 
 for (t in Test_item) {
   for (o in outcome) {
-    file_names <- paste0(target_folder_path,t,"_",o,".csv")
-    d_tmp <- fread(paste0(target_folder_path, matched_files[1]))
+    file_names <- paste0(target_folder_path,t,"_",o,".csv") # clean_df
+    d_tmp <- fread(file_names)
     d_tmp <- d_tmp[apply(d_tmp[, ..exclude_columns], 1, sum) < 1]
     
     # cal mean, median , sd by ID, season
-    select_col <- c("ID", "Index_date", "Test_date", "numeric_value","unit")
+    select_col <- c("ID", "Index_date", "Test_date", "numeric_value", "unit")
     
     dt_v <- d_tmp[,..select_col]
     dt_v <- dt_v[, followup := as.numeric(Test_date-Index_date)]
     dt_v[, interval := create_intervals(dt_v$followup, 5, 90, 45)]
     dt_v <- dt_v[!is.na(interval)] 
-    
+
     dt_v <- dt_v[, .(
-      mean_value = mean(numeric_value, na.rm = TRUE),
-      sd_value = sd(numeric_value, na.rm = TRUE),
-      rms_value = sqrt(mean(numeric_value^2, na.rm = TRUE)),
-      cv_value = sd(numeric_value, na.rm = TRUE) / mean(numeric_value, na.rm = TRUE)
-    ), by = .(ID, interval)]
-    dt_v <- dcast(dt_v, ID ~ interval, 
-                  value.var = c("mean_value", "sd_value", "rms_value", "cv_value"))
-    select_col <- c("ID", "SEX_TYPE", "Index_year", "AGE_GROUP", "Hypertension_event",
-                    "PeripheralEnthe_event", "UnknownCauses_event", "LipoidMetabDis_event",
-                    "AcuteURI_event", "AbdPelvicSymptoms_event", "Dermatophytosis_event",
-                    "GenSymptoms_event", "RespChestSymptoms_event", "HeadNeckSymptoms_event", 
-                    "ContactDermEczema_event", "ViralInfection_event", "ObesityHyperal_event",
-                    "JointDisorders_event", "AcuteBronchitis_event", "SoftTissueDis_event",
-                    "BloodExamFindings_event", "RefractionDis_event", "ConjunctivaDis_event")
+      mean_value = mean(numeric_value, na.rm = TRUE)), by = .(ID, interval)]
+    dt_v <- dcast(dt_v, ID ~ interval, value.var = c("mean_value"))
+    interval_cols <- paste0("mean",0:4)
+    setnames(dt_v, old = names(dt_v)[-1], new = interval_cols)
+    
+    # cal sd, cv, rms by ppl 
+    dt_v[, sd_value := apply(.SD, 1, sd, na.rm = TRUE), .SDcols = interval_cols]
+    dt_v[, cv_value := apply(.SD, 1, function(x) sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE)), .SDcols = interval_cols]
+    dt_v[, rms_value := apply(.SD, 1, function(x) sqrt(mean(x^2, na.rm = TRUE))), .SDcols = interval_cols]
+    
+    select_col <- c("ID", "SEX_TYPE", "Index_year", "AGE_GROUP", 
+                    "Hypertension_event","PeripheralEnthe_event", 
+                    "UnknownCauses_event", "LipoidMetabDis_event",
+                    "AcuteURI_event", "AbdPelvicSymptoms_event", 
+                    "Dermatophytosis_event","GenSymptoms_event", 
+                    "RespChestSymptoms_event", "HeadNeckSymptoms_event", 
+                    "ContactDermEczema_event", "ViralInfection_event", 
+                    "ObesityHyperal_event","JointDisorders_event", 
+                    "AcuteBronchitis_event", "SoftTissueDis_event",
+                    "BloodExamFindings_event", "RefractionDis_event", 
+                    "ConjunctivaDis_event")
     
     d_tmp[,Index_year:= format(d_tmp$Index_date, "%Y")] 
     d_tmp <- d_tmp[,..select_col]
@@ -75,15 +82,14 @@ for (t in Test_item) {
 }
 
 #===============================================================================
-# build model table: 要加only mean
-model_result <- data.table()
-inputs <- list(option1 = c("sd_value_0", "sd_value_1", "sd_value_2", 
-                           "sd_value_3", "sd_value_4"),
-               option2 = c("cv_value_0", "cv_value_1", "cv_value_2", 
-                           "cv_value_3", "cv_value_4"),
-               option3 = c("rms_value_0", "rms_value_1", "rms_value_2", 
-                           "rms_value_3", "rms_value_4")
+# build model table: 
+inputs <- list(option1 = c(),
+               option2 = c("sd_value"),
+               option3 = c("cv_value"),
+               option4 = c("rms_value")
                )
+
+model_result <- data.table()
 m <- 1
 for(o in outcome){
   # prepare y 
@@ -106,27 +112,33 @@ for(o in outcome){
                       "JointDisorders_event", "AcuteBronchitis_event",
                       "SoftTissueDis_event", "BloodExamFindings_event",
                       "RefractionDis_event", "ConjunctivaDis_event")
+    
     dt_x[, (category_col) := lapply(.SD, as.factor), .SDcols = category_col]
     dt_T <- merge(dt_y, dt_x, by = "ID", all.y = T)
-    dt_T <- dt_T[,-1]
-    # 檢查數據框中所有因子變量是否有多個層次
+    
+    # 檢查data中所有類別變數是否有多類別
     factor_columns <- sapply(dt_T, is.factor)
     single_level_factors <- sapply(dt_T[,..factor_columns], 
                                    function(x) length(unique(x)))
     for (col in names(single_level_factors)) {
       if (length(levels(dt_T[[col]])) < 2) {
-        dt_T[[col]] <- NULL  # 刪除只有一個層次的變量
+        dt_T[[col]] <- NULL  
       }
     }
     
     for(i in names(inputs)){
       # select col
-      select_col <- c(names(dt_T)[1:22], inputs[[i]])
+      select_col <- c(names(dt_T)[2:19], inputs[[i]])
       dt_T_X <- dt_T[,..select_col]
-      dt_T_X <- dt_T_X[rowSums(is.na(dt_T_X)) == 0, ]
       col_y <- c(paste0(o, "_followup"), paste0(o, "_event"))
-      cox_model <- coxph(Surv(get(col_y[1]), get(col_y[2])) ~ ., data = dt_T_X)
-    
+      
+      time_col <- col_y[1]
+      event_col <- col_y[2]
+      
+      # build model
+      cox_model <- coxph(Surv(dt_T_X[[time_col]], dt_T_X[[event_col]]) ~ ., 
+                         data = dt_T_X[, !c(time_col, event_col), with = FALSE])
+
       # Generate summary
       summary_cox <- summary(cox_model)
       

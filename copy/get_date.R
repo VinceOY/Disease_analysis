@@ -10,8 +10,8 @@ library(ggplot2)
 ## get disease code list
 folder_path2 = "C:/Users/USER/Downloads/TMUCRD_2021_csv/"
 dt1 <- fread(paste0(folder_path2, "ICD92ICD10.csv"))
-dt1 <- dt1[, c("ICD-9" ,"ICD-10-CM"),with = FALSE]
-setnames(dt1, "ICD-9", "ICD9")
+dt1 <- dt1[, c("ICD-9-CM代碼" ,"ICD-10-CM"),with = FALSE]
+setnames(dt1, "ICD-9-CM代碼", "ICD9")
 setnames(dt1, "ICD-10-CM", "ICD10")
 ICD9_codes = list(EyeComp = c("362.01","362.02","362.55", "362.11",
                               "365.44","369","361","369.60"),
@@ -116,8 +116,8 @@ taget_outcome_diseases <- c(target_disease, outcome_diseases)
 
 #===============================================================================
 # get data
-# k = 
-# data_set_name <- names(parameters$data_sets)[1]
+data_set_name <- names(parameters$data_sets)[2]
+file <- dt_file_list[1]
 for (data_set_name in names(parameters$data_sets)) {
   data_set <- parameters$data_sets[[data_set_name]]
   dt_file_list <- data_set$file_list
@@ -196,7 +196,7 @@ for (d in taget_outcome_diseases) {
 
 dt_target <- disease_list$Diabete
 setnames(dt_target , "Date", "Index_date")
-# output
+
 #===============================================================================
 # Merge tables
 # step1: merge basic, index_date by CHR_NO and cal age / sep age group 
