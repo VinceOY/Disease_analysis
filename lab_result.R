@@ -6,8 +6,8 @@ library(stringr)
 # define parameters: 
 # related_diseases: 目標疾病, outcome, control 
 parameters <- list(
-  input_path = "C:/Users/USER/Downloads/proj_data/step4/",
-  output_path = "C:/Users/USER/Downloads/proj_data/step5/",
+  input_path = "C:/Users/USER/Downloads/proj_data/TMUCRD_2021_csv/",
+  output_path = "C:/Users/USER/Downloads/proj_data/step3/",
   related_diseases = c("Diabete","EyeComp", "CardioDisease", "CerebroDisease", 
                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro",
                        "Hypertension","PeripheralEnthe","UnknownCauses",

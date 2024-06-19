@@ -96,13 +96,13 @@ for (d in taget_outcome_diseases) {
 
 dt_target <- disease_list$Diabete
 setnames(dt_target , "Date", "Index_date")
-csv_file_name <- paste0(input_path, "dt_target.csv")
+csv_file_name <- paste0(output_path, "dt_target.csv")
 fwrite(dt_target, file = csv_file_name, row.names = FALSE)
 
 #===============================================================================
 # Merge tables
 # step1: merge basic, index_date by CHR_NO and cal age / sep age group 
-dt_target <- fread(paste0(input_path, "dt_target.csv"))
+dt_target <- fread(paste0(output_path, "dt_target.csv"))
 dt_merge <- merge(dt_basic, dt_target, by = "ID", all = FALSE) 
 dt_merge[, AGE := as.numeric(difftime(Index_date, BIRTH_DATE, 
                                       units = "days")) / 365.25]

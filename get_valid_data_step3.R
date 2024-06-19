@@ -65,7 +65,7 @@ for (o in outcome_diseases) {
   dt_exlcude[, exclude_outcome2 := ifelse(get(col) <= 365 & get(col) >= 0, 1, 0)]
   d_tmp <- dt_exlcude
   need_col <- c(select_col, paste0(o,"_Date"), paste0(o,"_event"),
-                "exclude_outcome1", "exclude_outcome2")
+                paste0(o,"_followup"), "exclude_outcome1", "exclude_outcome2")
   d_tmp <- d_tmp[, ..need_col]
   
   print(paste0("# of before index_date: ", 
@@ -78,7 +78,7 @@ for (o in outcome_diseases) {
   
   print(paste0("# of patients: ", length(unique(dt_clean$ID))))
   
-  csv_file_name <- paste0(output_path, o, "_exclude2.csv.csv")
+  csv_file_name <- paste0(output_path, o, "_exclude2.csv")
   fwrite(dt_clean, file = csv_file_name, row.names = FALSE)
 }
 
