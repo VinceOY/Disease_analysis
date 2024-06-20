@@ -173,21 +173,3 @@ print(paste0("# of patients: ", length(unique(dt_merge$ID))))
 csv_file_name <- paste0(output_path, "dt_merge.csv")
 fwrite(dt_merge, file = csv_file_name, row.names = FALSE)
 dim(dt_merge)
-
-#===============================================================================
-# fill NA 可以往上合併
-#dt_merge[ ,end_date := DEATH_DATE]
-#date_cols <- names(dt_merge)[sapply(dt_merge, is.date)]
-#max_dates <- lapply(dt_merge[, ..date_cols], max, na.rm = TRUE)
-#last_date <- do.call(max, c(max_dates, na.rm = TRUE))
-#dt_merge[, end_date := ifelse(is.na(end_date), last_date, end_date)]
-#dt_merge[, end_date := as.Date(end_date, origin = "1970-01-01")]
-
-#for (d in outcome_diseases) {
-#  y <- paste0(d, "_Date")
-#  y2 <- paste0(d,"_event")
-#  dt_merge[, (y) := ifelse(get(y2)==1, get(y), end_date)]
-#  dt_merge[, (y) := as.Date(get(y), origin = "1970-01-01")]
-#  dt_merge[, followup := get(y) - Index_date]
-#  setnames(dt_merge, "followup", paste0(d,"_followup"))
-#}
