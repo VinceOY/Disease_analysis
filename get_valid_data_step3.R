@@ -50,7 +50,7 @@ print(paste0("# of patients: ",
 dt_exlcude <- dt_merge[dt_merge[, exclude_Indexdate==0&
                                   exclude_ID==0&
                                   exclude_AGE==0]]
-
+print(length(dt_exlcude$ID))
 csv_file_name <- paste0(output_path,"dt_exclude1.csv")
 fwrite(dt_exlcude, file = csv_file_name, row.names = FALSE)                                                                                             
 
@@ -81,4 +81,3 @@ for (o in outcome_diseases) {
   csv_file_name <- paste0(output_path, o, "_exclude2.csv")
   fwrite(dt_clean, file = csv_file_name, row.names = FALSE)
 }
-

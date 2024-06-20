@@ -22,7 +22,7 @@ outcome_diseases <- parameters$outcome_diseases
 #===============================================================================
 # create table1
 dt_outcome <- fread(paste0(input_path, "dt_exclude1.csv"))
-dt_outcome[,year:= format(dt_outcome$Index_date, "%Y")] 
+dt_outcome[,year:= year(Index_date)] 
 continuous_col <- c("AGE")
 category_col <- c("year","SEX_TYPE", "AGE_GROUP", "Hypertension_event",      
                   "PeripheralEnthe_event", "UnknownCauses_event", 
@@ -80,17 +80,18 @@ for (t in names(Test_item)) {
   dt_test_T <- dt_test_T[, exclude_testdate_na := ifelse(is.na(Test_date), 1, 0)]
 
   # exclude
-  dt_test_T <- dt_test_T[outliers==0]
-  dt_test_T <- dt_test_T[na_col==0]
-  dt_test_T <- dt_test_T[exclude_testdate_na==0]
+  #dt_test_T <- dt_test_T[outliers==0]
+  #dt_test_T <- dt_test_T[na_col==0]
+  #dt_test_T <- dt_test_T[exclude_testdate_na==0]
   
   dt_test_T <- dt_test_T[, followup := as.numeric(Test_date-Index_date)]
   dt_test_T[, interval := create_intervals(dt_test_T$followup, season_i, interval)]
   
+  length(unique(dt_test_T$ID))
+  
   csv_file_name <- paste0(output_path,t,"_lab.csv")  
   fwrite(dt_test_T, file = csv_file_name, row.names = FALSE)
 } 
-
 
 
 # get valid id data  
@@ -132,15 +133,20 @@ for (t in names(Test_item)) {
 # input: get valid id data  
 tb3_T <- data.table()
 for (t in names(Test_item)) {
+  dt_test <- fread(paste0(output_path, t, "_lab.csv"))
   valid_id_name <- paste0(t,"_valid_ID.csv")
   valid_id <- fread(paste0(output_path, valid_id_name))
   tb3 <- data.table()
   for (o in outcome_diseases) {
     dt <- fread( paste0(input_path, o,"_exclude2.csv"))
     dt <- dt[ID %in% valid_id$ID]
-    
-    fwrite(data.table(ID = dt$ID), paste0(output_path, o, "_", t, 
+    valid_id_f <- dt$ID
+    fwrite(data.table(ID = valid_id_f), paste0(output_path, o, "_", t, 
                                          "_valid_ID.csv"), row.names = FALSE)
+    ### out putdf
+    clean_df <- dt_test[ID %in% valid_id_f]
+    csv_file_name <- paste0(output_path, t,"_", o,"_dtf.csv") 
+    fwrite(clean_df, file = csv_file_name, row.names = FALSE)
     
     #table3
     Total_people <- length(unique(dt$ID))
@@ -155,19 +161,4 @@ for (t in names(Test_item)) {
 }
 csv_file_name <- paste0(output_path, "table3_all_outcome_summary.csv")
 fwrite(tb3_T, file = csv_file_name, row.names = FALSE)
-
-#===============================================================================
-# create table 4~15 
-for (t in names(Test_item)) {
-  dt_test <- fread(paste0(output_path, t, "_lab.csv"))
-  dt_test <- dt_test[!is.na(interval)] 
-  for (o in outcome_diseases) {
-    valid_id <- fread( paste0(output_path, o, "_", t, "_valid_ID.csv"))
-    dt_test <- dt_test[ID %in% valid_id$ID]
-    csv_file_name <- paste0(output_path, t,"_", o,"_dtf.csv") 
-    fwrite(dt_test, file = csv_file_name, row.names = FALSE)
-  }
-}
-
-
 

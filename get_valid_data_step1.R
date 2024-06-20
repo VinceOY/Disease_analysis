@@ -7,7 +7,7 @@ library(stringr)
 #===============================================================================
 # set parameters
 parameters <- list(
-  folder_path = "C:/Users/USER/Downloads/proj_data/TMUCRD_2021_csv/",
+  input_path = "C:/Users/USER/Downloads/proj_data/TMUCRD_2021_csv/",
   output_path = "C:/Users/USER/Downloads/proj_data/step1/",
   data_sets = list(
     opd = list(
@@ -30,11 +30,11 @@ parameters <- list(
     )
   )
 )
-folder_path <- parameters$folder_path
+input_path <- parameters$input_path
 output_path <- parameters$output_path
 #===============================================================================
 ## get disease code list
-dt1 <- fread(paste0(folder_path, "ICD92ICD10.csv"))
+dt1 <- fread(paste0(input_path, "ICD92ICD10.csv"))
 dt1 <- dt1[, c("ICD-9-CM代碼" ,"ICD-10-CM"),with = FALSE]
 setnames(dt1, "ICD-9-CM代碼", "ICD9")
 setnames(dt1, "ICD-10-CM", "ICD10")
@@ -112,7 +112,7 @@ for (data_set_name in names(parameters$data_sets)) {
   
   for (file in dt_file_list) {
     hospital_names <- gsub(".*_(.*)\\.csv", "\\1", file)
-    d_tmp <- fread(paste0(folder_path, file))
+    d_tmp <- fread(paste0(input_path, file))
     merge_df <- fetch_data2(d_tmp, dt_target_ID_cols, dt_disease_ID_cols, 
                             disease_codes)
     for (name in names(merge_df)) {

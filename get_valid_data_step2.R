@@ -98,7 +98,7 @@ dt_target <- disease_list$Diabete
 setnames(dt_target , "Date", "Index_date")
 csv_file_name <- paste0(output_path, "dt_target.csv")
 fwrite(dt_target, file = csv_file_name, row.names = FALSE)
-
+length(unique(dt_target$ID))
 #===============================================================================
 # Merge tables
 # step1: merge basic, index_date by CHR_NO and cal age / sep age group 

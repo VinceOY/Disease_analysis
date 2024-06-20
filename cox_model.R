@@ -19,6 +19,8 @@ Test_item <- parameters$Test_item
 outcome_diseases <- parameters$outcome_diseases
 
 #===============================================================================
+#t <- Test_item[1]
+#o <- outcome_diseases[1]
 for (t in Test_item) {
   for (o in outcome_diseases) {
     d_tmp <- fread(paste0(input_path,t,"_",o,"_dtf.csv"))
@@ -31,11 +33,13 @@ for (t in Test_item) {
       mean_value = mean(numeric_value, na.rm = TRUE)), by = .(ID, interval)]
     
     dt_v <- dcast(dt_v, ID ~ interval, value.var = c("mean_value"))
-    interval_cols <- paste0("mean",0:4) # check
+    interval_cols <- paste0("mean",0:4) 
     setnames(dt_v, old = names(dt_v)[-1], new = interval_cols)
     dt_v[, sd_value := apply(.SD, 1, sd, na.rm = TRUE), .SDcols = interval_cols]
-    dt_v[, cv_value := apply(.SD, 1, function(x) sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE)), .SDcols = interval_cols]
-    dt_v[, rms_value := apply(.SD, 1, function(x) sqrt(mean(x^2, na.rm = TRUE))), .SDcols = interval_cols]
+    dt_v[, cv_value := apply(.SD, 1, function(x) sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE)),
+         .SDcols = interval_cols]
+    dt_v[, rms_value := apply(.SD, 1, function(x) sqrt(mean(x^2, na.rm = TRUE))), 
+         .SDcols = interval_cols]
     
     select_col2 <- c("ID", "SEX_TYPE", "Index_year", "AGE_GROUP", 
                     "Hypertension_event","PeripheralEnthe_event", 
@@ -50,23 +54,26 @@ for (t in Test_item) {
                     "ConjunctivaDis_event", paste0(o, "_event"), 
                     paste0(o, "_followup"))
     
-    d_tmp[,Index_year:= format(d_tmp$Index_date, "%Y")] 
+    d_tmp[,Index_year:= year(Index_date)] 
     d_tmp <- d_tmp[,..select_col2]
     d_tmp <- d_tmp[!duplicated(d_tmp), ]
     d_tmp <- merge(d_tmp, dt_v, by = "ID", all = T)
-    csv_file_name <- paste0(output_path, t,"_",o,"_dtf_all.csv") # output: basic, outcome, mean, variation score by ppl * 12
+    # output: basic, outcome, mean, variation score by ppl * 12
+    csv_file_name <- paste0(output_path, t,"_",o,"_dtf_all.csv") 
     fwrite(d_tmp, file = csv_file_name, row.names = FALSE)
   }
 }
 
 #===============================================================================
 # build model table: 
+# variable input 修改
 inputs <- list(option1 = c(),
                option2 = c("sd_value"),
                option3 = c("cv_value"),
                option4 = c("rms_value"))
 model_result <- data.table()
 m <- 1
+
 for(o in outcome_diseases){
   for(t in Test_item){
     # prepare y 
@@ -94,7 +101,7 @@ for(o in outcome_diseases){
                       "ContactDermEczema_event", "ViralInfection_event",
                       "ObesityHyperal_event", "AcuteBronchitis_event",  
                       "SoftTissueDis_event", "BloodExamFindings_event", 
-                      "ConjunctivaDis_event", paste0(o, "_event"), 
+                      "ConjunctivaDis_event", "mean0" ,paste0(o, "_event"), 
                       paste0(o, "_followup"))
       
       select_col <- c(select_col, inputs[[i]])
@@ -114,9 +121,12 @@ for(o in outcome_diseases){
       event_col <- paste0(o, "_event")
       
       # build model
+      #var <- paste('Surv(',t,',',e,')~',col, '+')
+      #as.formula(var)
+      
       cox_model <- coxph(Surv(dt_input[[time_col]], dt_input[[event_col]]) ~ ., 
                          data = dt_input[, !c(time_col, event_col), with = FALSE])
-
+      
       # Generate summary
       summary_cox <- summary(cox_model)
       
@@ -135,9 +145,10 @@ for(o in outcome_diseases){
                                            ifelse(p_value < 0.1, ".", ""))))
       # Create a new table for the output
       output_table <- data.table(
-        model = paste0("model",m),
+        model = paste0("model", m),
         test_item = t, 
         outcome = o,
+        n = nrow(dt_input),
         Variable = var,
         HR = HR,
         CI = CI,
