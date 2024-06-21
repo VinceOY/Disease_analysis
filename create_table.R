@@ -93,7 +93,6 @@ for (t in names(Test_item)) {
   fwrite(dt_test_T, file = csv_file_name, row.names = FALSE)
 } 
 
-
 # get valid id data  
 for (t in names(Test_item)) {
   dt_test_T <- fread(paste0(output_path, t, "_lab.csv"))
@@ -140,11 +139,9 @@ for (t in names(Test_item)) {
   for (o in outcome_diseases) {
     dt <- fread( paste0(input_path, o,"_exclude2.csv"))
     dt <- dt[ID %in% valid_id$ID]
-    valid_id_f <- dt$ID
-    fwrite(data.table(ID = valid_id_f), paste0(output_path, o, "_", t, 
-                                         "_valid_ID.csv"), row.names = FALSE)
-    ### out putdf
-    clean_df <- dt_test[ID %in% valid_id_f]
+    
+    # output df
+    clean_df <- dt_test[ID %in% dt$ID]
     csv_file_name <- paste0(output_path, t,"_", o,"_dtf.csv") 
     fwrite(clean_df, file = csv_file_name, row.names = FALSE)
     

@@ -48,20 +48,30 @@ Disease_analysis/
 - lab_result.R: 
   - 目的: 雙和、北醫、萬芳檢驗資料整合
     - input_files: v_labresult_t.csv、v_labresult_s.csv.csv、v_exper_sign_w.csv
-    - output_table: 三院資料整合與重新命名欄位(lab_result.csv) * 2(test_items)
+    - output_table: 三院資料整合與重新命名欄位(lab_result.csv) * 1
 
-- create_table.R:  (todo)
-  - 目的: 資料摘要表(包括全體、有檢驗項目、及條件篩選過後的摘要表)
-    - input: outcome_clean.csv、lab_result.csv
-    - output: 
-    - output_table1: 所有糖尿病患者的基本資料摘要
-    - output_table2: index date一年內4季皆有定期檢驗test_item的糖尿病患者中test_item檢驗值的統計值*2
-    - output_table3: 目標病患在各test_items對應到各outcome總數量、發病數量以及總追蹤時間
-    - output_table 4~15: 最後分析人選的檢驗資料(含基本資料) (test_outcome.csv) * 12 
+- create_table.R:  output * 20 
+  - 目的: 輸出資料表、以及最後要放入模型分析的病患檔案
+    - table1: dt_exclude1下基本資料欄位分布, table1_basic.csv *1
+    - table2: 有效患者各季test item的檢驗值、次數
+      - step1:# find disease lab + add interval_col
+        - input: 3院lab檔、dt_exclude1
+        - output: test_lab.csv(每個患者的test值有算interval) *2
+        
+      - step2: # get valid id data
+        - input: dt_exclude1下lab檔
+        - cutpoint2: test_valid_id.csv (定期做檢驗的病人ID) *2
+        - output: test_item_table2.csv *2
+        
+    - table3: exclude2下4季皆有追蹤的患者: 各outcome (event、總數量、總追蹤時間) todo: 加一欄算盛行率
+        - input: test_item_valid_id、dt_exclude2
+        - cutpoint: test_outcome_dtf.csv * 12 
+        - output: table3_all_outcome_summary.csv *1
 
 - cox_model_result.R: 
   - 目的: 從6 outcomes, 2 test items, 4 variable selections, 整理48個cox model的result
-    - input_table: test_lab.csv、outcome_test_valid_id.csv
+    - input_table: test_outcome_dtf.csv
     - output_table: 
       -  test_outcome_dtf_all.csv
       -  model_summary.csv
+      

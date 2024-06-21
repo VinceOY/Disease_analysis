@@ -17,7 +17,6 @@ input_path <- parameters$input_path
 output_path <- parameters$output_path
 Test_item <- parameters$Test_item
 outcome_diseases <- parameters$outcome_diseases
-
 #===============================================================================
 #t <- Test_item[1]
 #o <- outcome_diseases[1]
@@ -33,26 +32,28 @@ for (t in Test_item) {
       mean_value = mean(numeric_value, na.rm = TRUE)), by = .(ID, interval)]
     
     dt_v <- dcast(dt_v, ID ~ interval, value.var = c("mean_value"))
-    interval_cols <- paste0("mean",0:4) 
+    interval_cols <- paste0("mean",0:(length(unique(d_tmp$interval))-2)) # trans
     setnames(dt_v, old = names(dt_v)[-1], new = interval_cols)
     dt_v[, sd_value := apply(.SD, 1, sd, na.rm = TRUE), .SDcols = interval_cols]
     dt_v[, cv_value := apply(.SD, 1, function(x) sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE)),
          .SDcols = interval_cols]
     dt_v[, rms_value := apply(.SD, 1, function(x) sqrt(mean(x^2, na.rm = TRUE))), 
          .SDcols = interval_cols]
-    
-    select_col2 <- c("ID", "SEX_TYPE", "Index_year", "AGE_GROUP", 
-                    "Hypertension_event","PeripheralEnthe_event", 
-                    "UnknownCauses_event", "LipoidMetabDis_event",
-                    "AcuteURI_event", "AbdPelvicSymptoms_event", 
-                    "Dermatophytosis_event","GenSymptoms_event", 
-                    "RespChestSymptoms_event", "HeadNeckSymptoms_event", 
-                    "ContactDermEczema_event", "ViralInfection_event", 
-                    "ObesityHyperal_event","JointDisorders_event", 
-                    "AcuteBronchitis_event", "SoftTissueDis_event",
-                    "BloodExamFindings_event", "RefractionDis_event", 
-                    "ConjunctivaDis_event", paste0(o, "_event"), 
-                    paste0(o, "_followup"))
+    # adj
+    #dt_v[, adj_mean := ifelse(mean0 < 3.5 | mean0 > 5.5, ifelse(mean0 < 3.5, 1, 2), 0)]
+
+    select_col2 <- c("ID", "SEX_TYPE", "Index_year", "AGE","AGE_GROUP", 
+                "Hypertension_event","PeripheralEnthe_event", 
+                "UnknownCauses_event", "LipoidMetabDis_event",
+                "AcuteURI_event", "AbdPelvicSymptoms_event", 
+                "Dermatophytosis_event","GenSymptoms_event", 
+                "RespChestSymptoms_event", "HeadNeckSymptoms_event", 
+                "ContactDermEczema_event", "ViralInfection_event", 
+                "ObesityHyperal_event","JointDisorders_event", 
+                "AcuteBronchitis_event", "SoftTissueDis_event",
+                "BloodExamFindings_event", "RefractionDis_event", 
+                "ConjunctivaDis_event", paste0(o, "_event"), 
+                paste0(o, "_followup"))
     
     d_tmp[,Index_year:= year(Index_date)] 
     d_tmp <- d_tmp[,..select_col2]
@@ -93,7 +94,7 @@ for(o in outcome_diseases){
     dt[, (category_col) := lapply(.SD, as.factor), .SDcols = category_col]
     
     for(i in names(inputs)){
-      select_col <- c("SEX_TYPE", "Index_year", "AGE_GROUP", "Hypertension_event",
+      select_col <- c("SEX_TYPE", "Index_year", "AGE", "Hypertension_event",
                       "PeripheralEnthe_event", "LipoidMetabDis_event",   
                       "AcuteURI_event", "AbdPelvicSymptoms_event", 
                       "Dermatophytosis_event", "GenSymptoms_event", 
@@ -106,7 +107,7 @@ for(o in outcome_diseases){
       
       select_col <- c(select_col, inputs[[i]])
       dt_input <- dt[,..select_col]
-      
+
       # 刪除只有一種類別的欄位
       factor_columns <- sapply(dt_input, is.factor)
       check_level_factors <- sapply(dt_input[,..factor_columns], 
