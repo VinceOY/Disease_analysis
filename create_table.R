@@ -8,9 +8,18 @@ library(stringr)
 parameters <- list(
   input_path = "C:/Users/USER/Downloads/proj_data/step3/",
   output_path = "C:/Users/USER/Downloads/proj_data/step4/",
-  Test_item = list(HbA1c = list(ID = c("014701","F09006B"), unit = c("%")),
+  Test_item = list(HbA1c = list(ID = c("014701","F09006B"), 
+                                unit = c("%")),
                    ALBUMIN = list(ID = c("010301","11D101","F09038C"), 
-                                  unit = c("(?i) g/dl"))), 
+                                  unit = c("(?i) g/dl")),
+                   Uric  = list(ID = c("F09013C","011001"), 
+                                unit = c("mg/dl")),
+                   Creatinine = list(ID = c("F09015C","11D101","11A201", "010801","011C01"), 
+                                     unit = c("mg/dl")),
+                   HDL = list(ID = c("F09043C", "011301"), 
+                              unit = c("mg/dl")),
+                   LDL = list(ID = c("F09044C", "011401"), 
+                              unit = c("mg/dl"))),
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro")
 )
@@ -139,11 +148,33 @@ for (t in names(Test_item)) {
   for (o in outcome_diseases) {
     dt <- fread( paste0(input_path, o,"_exclude2.csv"))
     dt <- dt[ID %in% valid_id$ID]
+
+    # output table1
+    dt[,year:= year(Index_date)] 
+    continuous_col <- c("AGE")
+    category_col <- c("year","SEX_TYPE", "AGE_GROUP", "Hypertension_event",      
+                      "PeripheralEnthe_event", "UnknownCauses_event", 
+                      "LipoidMetabDis_event", "AcuteURI_event", 
+                      "AbdPelvicSymptoms_event", "Dermatophytosis_event", 
+                      "GenSymptoms_event", "RespChestSymptoms_event",
+                      "HeadNeckSymptoms_event", "ContactDermEczema_event",
+                      "ViralInfection_event", "ObesityHyperal_event",   
+                      "JointDisorders_event", "AcuteBronchitis_event",
+                      "SoftTissueDis_event", "BloodExamFindings_event",
+                      "RefractionDis_event", "ConjunctivaDis_event")
+    
+    dt[, (category_col) := lapply(.SD, as.factor), .SDcols = category_col]
+    tb1 <- create.table1(dt, need.col = c(continuous_col,category_col))
+    csv_file_name <- paste0(output_path, o, "_", t,"_table1_basic.csv") # excel 
+    fwrite(tb1, file = csv_file_name, row.names = FALSE)
+    
+    
     
     # output df
     clean_df <- dt_test[ID %in% dt$ID]
     csv_file_name <- paste0(output_path, t,"_", o,"_dtf.csv") 
     fwrite(clean_df, file = csv_file_name, row.names = FALSE)
+    
     
     #table3
     Total_people <- length(unique(dt$ID))
@@ -156,6 +187,9 @@ for (t in names(Test_item)) {
   }
   tb3_T <- rbind(tb3_T,tb3)
 }
+
+tb3_T[, ("IR%") := round(get("# of event") / (get("sum of follow up")/365)*100, 
+                         3)]
+
 csv_file_name <- paste0(output_path, "table3_all_outcome_summary.csv")
 fwrite(tb3_T, file = csv_file_name, row.names = FALSE)
-

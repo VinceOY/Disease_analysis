@@ -9,7 +9,7 @@ library(survival)
 parameters <- list(
   input_path = "C:/Users/USER/Downloads/proj_data/step4/",
   output_path = "C:/Users/USER/Downloads/proj_data/step5/",
-  Test_item = c("HbA1c", "ALBUMIN"),
+  Test_item = c("HbA1c", "ALBUMIN", "Uric","Creatinine", "HDL","LDL"),
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro")
 )
@@ -18,8 +18,21 @@ output_path <- parameters$output_path
 Test_item <- parameters$Test_item
 outcome_diseases <- parameters$outcome_diseases
 #===============================================================================
-#t <- Test_item[1]
-#o <- outcome_diseases[1]
+# 定義加權標準差函數
+# need to know n(m): 每一個ID每一個月份的test data數量 n是筆數, m是月份
+# 撈出id, interval, month 
+
+w.sd <- function(x, w) {
+  if (length(x) != length(w)) stop("x and w must be the same length")
+  if (all(is.na(x))) return(NA)
+  
+  avg <- weighted.mean(x, w, na.rm = TRUE)
+  variance <- sum(w * (x - avg)^2, na.rm = TRUE) / sum(w, na.rm = TRUE)
+  sqrt(variance)
+}
+
+#t <- Test_item[2]
+#o <- outcome_diseases[2]
 for (t in Test_item) {
   for (o in outcome_diseases) {
     d_tmp <- fread(paste0(input_path,t,"_",o,"_dtf.csv"))
@@ -27,20 +40,26 @@ for (t in Test_item) {
                     "interval")
     dt_v <- d_tmp[,..select_col]
     dt_v <- dt_v[!is.na(interval)] 
+    dt_v[, m := month(Test_date) ]
     
+    # cal weight average
+    dt_v <- dt_v[, weight := .N, by = .(ID, m, interval)]
+
     dt_v <- dt_v[, .(
-      mean_value = mean(numeric_value, na.rm = TRUE)), by = .(ID, interval)]
+      mean_value = weighted.mean(numeric_value, weight, na.rm = TRUE)), 
+      by = .(ID, interval)]
+    
+    dt_v <- dt_v[, weight_s := .N, by = .(ID, interval)]
     
     dt_v <- dcast(dt_v, ID ~ interval, value.var = c("mean_value"))
-    interval_cols <- paste0("mean",0:(length(unique(d_tmp$interval))-2)) # trans
+    interval_cols <- paste0("mean",0:(length(unique(d_tmp$interval))-2))
     setnames(dt_v, old = names(dt_v)[-1], new = interval_cols)
+
     dt_v[, sd_value := apply(.SD, 1, sd, na.rm = TRUE), .SDcols = interval_cols]
     dt_v[, cv_value := apply(.SD, 1, function(x) sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE)),
          .SDcols = interval_cols]
     dt_v[, rms_value := apply(.SD, 1, function(x) sqrt(mean(x^2, na.rm = TRUE))), 
          .SDcols = interval_cols]
-    # adj
-    #dt_v[, adj_mean := ifelse(mean0 < 3.5 | mean0 > 5.5, ifelse(mean0 < 3.5, 1, 2), 0)]
 
     select_col2 <- c("ID", "SEX_TYPE", "Index_year", "AGE","AGE_GROUP", 
                 "Hypertension_event","PeripheralEnthe_event", 
@@ -60,7 +79,7 @@ for (t in Test_item) {
     d_tmp <- d_tmp[!duplicated(d_tmp), ]
     d_tmp <- merge(d_tmp, dt_v, by = "ID", all = T)
     # output: basic, outcome, mean, variation score by ppl * 12
-    csv_file_name <- paste0(output_path, t,"_",o,"_dtf_all.csv") 
+    csv_file_name <- paste0(output_path, t,"_",o,"_dtf_all.csv")
     fwrite(d_tmp, file = csv_file_name, row.names = FALSE)
   }
 }
