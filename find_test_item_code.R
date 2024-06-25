@@ -29,6 +29,7 @@ for (file in item_files) {
   d_tmp <- fread(paste0(input_path, file))
   d_item <- rbind(d_item, d_tmp)
 }
+d_item$
 d_item <- d_item[,c("O_ITEM", "R_ITEM","R_ITEM_NAME"), with = FALSE]
 
 dt_selected <- d_item[grep("Glucose", R_ITEM_NAME, ignore.case = TRUE)]

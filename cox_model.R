@@ -4,12 +4,14 @@ setwd(new_dir)
 library(data.table)
 library(stringr)
 library(survival)
+# check data density plot
 #===============================================================================
 # set parameter
 parameters <- list(
   input_path = "C:/Users/USER/Downloads/proj_data/step4/",
   output_path = "C:/Users/USER/Downloads/proj_data/step5/",
-  Test_item = c("HbA1c", "ALBUMIN", "Uric","Creatinine", "HDL","LDL"),
+  Test_item = c("HbA1c", "ALBUMIN", "Uric", "HDL","LDL"),
+  #Test_item = c("HbA1c", "ALBUMIN", "Uric","Creatinine", "HDL","LDL"),
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro")
 )
@@ -31,8 +33,8 @@ w.sd <- function(x, w) {
   sqrt(variance)
 }
 
-#t <- Test_item[2]
-#o <- outcome_diseases[2]
+#t <- Test_item[6]
+#o <- outcome_diseases[6]
 for (t in Test_item) {
   for (o in outcome_diseases) {
     d_tmp <- fread(paste0(input_path,t,"_",o,"_dtf.csv"))
@@ -40,17 +42,10 @@ for (t in Test_item) {
                     "interval")
     dt_v <- d_tmp[,..select_col]
     dt_v <- dt_v[!is.na(interval)] 
-    dt_v[, m := month(Test_date) ]
-    
-    # cal weight average
-    dt_v <- dt_v[, weight := .N, by = .(ID, m, interval)]
 
     dt_v <- dt_v[, .(
-      mean_value = weighted.mean(numeric_value, weight, na.rm = TRUE)), 
-      by = .(ID, interval)]
-    
-    dt_v <- dt_v[, weight_s := .N, by = .(ID, interval)]
-    
+      mean_value = mean(numeric_value, na.rm = TRUE)), by = .(ID, interval)]
+
     dt_v <- dcast(dt_v, ID ~ interval, value.var = c("mean_value"))
     interval_cols <- paste0("mean",0:(length(unique(d_tmp$interval))-2))
     setnames(dt_v, old = names(dt_v)[-1], new = interval_cols)
@@ -78,6 +73,7 @@ for (t in Test_item) {
     d_tmp <- d_tmp[,..select_col2]
     d_tmp <- d_tmp[!duplicated(d_tmp), ]
     d_tmp <- merge(d_tmp, dt_v, by = "ID", all = T)
+    
     # output: basic, outcome, mean, variation score by ppl * 12
     csv_file_name <- paste0(output_path, t,"_",o,"_dtf_all.csv")
     fwrite(d_tmp, file = csv_file_name, row.names = FALSE)
@@ -86,7 +82,6 @@ for (t in Test_item) {
 
 #===============================================================================
 # build model table: 
-# variable input 修改
 inputs <- list(option1 = c(),
                option2 = c("sd_value"),
                option3 = c("cv_value"),

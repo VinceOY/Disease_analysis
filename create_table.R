@@ -3,6 +3,7 @@ source("tool_function/standard_function.R")
 source("tool_function/tableone.R")
 library(data.table)
 library(stringr)
+library(ggplot2)
 #===============================================================================
 # set parameter
 parameters <- list(
@@ -12,14 +13,12 @@ parameters <- list(
                                 unit = c("%")),
                    ALBUMIN = list(ID = c("010301","11D101","F09038C"), 
                                   unit = c("(?i) g/dl")),
-                   Uric  = list(ID = c("F09013C","011001"), 
-                                unit = c("mg/dl")),
-                   Creatinine = list(ID = c("F09015C","11D101","11A201", "010801","011C01"), 
-                                     unit = c("mg/dl")),
-                   HDL = list(ID = c("F09043C", "011301"), 
-                              unit = c("mg/dl")),
-                   LDL = list(ID = c("F09044C", "011401"), 
-                              unit = c("mg/dl"))),
+                   Uric  = list(ID = c("011001"), 
+                                unit = c("(?i) mg/dl")),
+                   HDL = list(ID = c("F09043A", "011301"), 
+                              unit = c("(?i) mg/dl")),
+                   LDL = list(ID = c("F09044A", "011401"), 
+                              unit = c("(?i) mg/dl"))),
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro")
 )
@@ -27,6 +26,11 @@ input_path <- parameters$input_path
 output_path <- parameters$output_path
 Test_item <- parameters$Test_item
 outcome_diseases <- parameters$outcome_diseases
+
+#Uric  = list(ID = c("F09013C","011001"), 
+#             unit = c("(?i) mg/dl")),
+#Creatinine = list(ID = c("F09015C","11D101","11A201", "010801","011C01"), 
+#                  unit = c("(?i) mg/dl")),
 
 #===============================================================================
 # create table1
@@ -69,6 +73,7 @@ season_i <- seq(0,365,90)
 interval <- 45
 
 # find disease lab + add interval_col
+#t <- names(Test_item)[6]
 for (t in names(Test_item)) {
   Test_ID <- Test_item[[t]]$ID
   unit_p <- Test_item[[t]]$unit
@@ -88,15 +93,26 @@ for (t in names(Test_item)) {
   dt_test_T <- merge(dt_outcome, dt_test, by = "ID", all.x = TRUE) # 得糖尿病沒檢驗的人
   dt_test_T <- dt_test_T[, exclude_testdate_na := ifelse(is.na(Test_date), 1, 0)]
 
-  # exclude
-  #dt_test_T <- dt_test_T[outliers==0]
-  #dt_test_T <- dt_test_T[na_col==0]
-  #dt_test_T <- dt_test_T[exclude_testdate_na==0]
-  
   dt_test_T <- dt_test_T[, followup := as.numeric(Test_date-Index_date)]
   dt_test_T[, interval := create_intervals(dt_test_T$followup, season_i, interval)]
   
-  length(unique(dt_test_T$ID))
+  ####
+  # drop outlier
+  #quantiles <- quantile(dt_test_T[!is.na(numeric_value)]$numeric_value, 
+  #                      probs = c(0.1, 0.9))
+  #q05 <- quantiles[1]
+  #q95 <- quantiles[2]
+  #dt_test_T <- dt_test_T[ numeric_value >= q05 & numeric_value  <= q95]
+  ####
+  
+  # check density plot 
+  test <- dt_test_T[!is.na(numeric_value)]
+  p <- ggplot(test, aes(x = numeric_value, color = hospital)) +
+    geom_density() +
+    labs(x = "values", y = "Density", title = paste0(t, "_Test Density Plot"))
+  print(p)
+  image_name <- paste0(output_path, t,"density_plot.png")
+  ggsave(image_name, plot = p, width = 6, height = 4, units = "in")
   
   csv_file_name <- paste0(output_path,t,"_lab.csv")  
   fwrite(dt_test_T, file = csv_file_name, row.names = FALSE)
@@ -168,17 +184,14 @@ for (t in names(Test_item)) {
     csv_file_name <- paste0(output_path, o, "_", t,"_table1_basic.csv") # excel 
     fwrite(tb1, file = csv_file_name, row.names = FALSE)
     
-    
-    
     # output df
     clean_df <- dt_test[ID %in% dt$ID]
     csv_file_name <- paste0(output_path, t,"_", o,"_dtf.csv") 
     fwrite(clean_df, file = csv_file_name, row.names = FALSE)
     
-    
     #table3
     Total_people <- length(unique(dt$ID))
-    need_col <- c("ID", paste0(o,"_event"), paste0(o,"_followup")) 
+    need_col <- c("ID", paste0(o,"_event"), paste0(o,"_followup"))
     dt <- dt[,..need_col]
     tb3_r <- data.table(outcome_test = paste0(o,"_",t), t(colSums(dt[,-1])), 
                         N = Total_people)
