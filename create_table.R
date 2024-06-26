@@ -13,7 +13,7 @@ parameters <- list(
                                 unit = c("%")),
                    ALBUMIN = list(ID = c("010301","11D101","F09038C"), 
                                   unit = c("(?i) g/dl")),
-                   Uric  = list(ID = c("011001"), 
+                   Uric  = list(ID = c("011001","F09013C"), 
                                 unit = c("(?i) mg/dl")),
                    HDL = list(ID = c("F09043A", "011301"), 
                               unit = c("(?i) mg/dl")),
@@ -109,7 +109,7 @@ for (t in names(Test_item)) {
   test <- dt_test_T[!is.na(numeric_value)]
   p <- ggplot(test, aes(x = numeric_value, color = hospital)) +
     geom_density() +
-    labs(x = "values", y = "Density", title = paste0(t, "_Test Density Plot"))
+    labs(x = "values", y = "Density", title = paste0(t, " Density Plot"))
   print(p)
   image_name <- paste0(output_path, t,"density_plot.png")
   ggsave(image_name, plot = p, width = 6, height = 4, units = "in")
