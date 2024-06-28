@@ -10,8 +10,8 @@ library(survival)
 parameters <- list(
   input_path = "C:/Users/USER/Downloads/proj_data/step4/",
   output_path = "C:/Users/USER/Downloads/proj_data/step5/",
-  Test_item = c("HbA1c", "ALBUMIN", "Uric", "HDL","LDL"),
-  #Test_item = c("HbA1c", "ALBUMIN", "Uric","Creatinine", "HDL","LDL"),
+  #Test_item = c("HbA1c", "ALBUMIN", "Uric", "HDL","LDL"),
+  Test_item = c("HbA1c", "ALBUMIN", "Uric","Creatinine", "HDL","LDL"),
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro")
 )
@@ -33,7 +33,7 @@ w.sd <- function(x, w) {
   sqrt(variance)
 }
 
-#t <- Test_item[6]
+#t <- Test_item[3]
 #o <- outcome_diseases[6]
 for (t in Test_item) {
   for (o in outcome_diseases) {
@@ -45,7 +45,7 @@ for (t in Test_item) {
 
     dt_v <- dt_v[, .(
       mean_value = mean(numeric_value, na.rm = TRUE)), by = .(ID, interval)]
-
+    
     dt_v <- dcast(dt_v, ID ~ interval, value.var = c("mean_value"))
     interval_cols <- paste0("mean",0:(length(unique(d_tmp$interval))-2))
     setnames(dt_v, old = names(dt_v)[-1], new = interval_cols)
@@ -94,6 +94,11 @@ for(o in outcome_diseases){
     # prepare y 
     file_names <- paste0(output_path, t, "_", o, "_dtf_all.csv")
     dt <- fread(file_names)
+    
+    # transfer to cate
+    #dt <- dt[, mean_fact :=  ifelse(mean0  < 3.4 | mean0  > 6, 
+    #                                ifelse(mean0  < 3.4, 1, 2), 0)]
+     
     category_col <- c("SEX_TYPE", "Index_year", "AGE_GROUP", "Hypertension_event",      
                       "PeripheralEnthe_event", "UnknownCauses_event", 
                       "LipoidMetabDis_event", "AcuteURI_event", 
@@ -106,7 +111,7 @@ for(o in outcome_diseases){
                       "RefractionDis_event", "ConjunctivaDis_event")
     
     dt[, (category_col) := lapply(.SD, as.factor), .SDcols = category_col]
-    
+    # modify mean0
     for(i in names(inputs)){
       select_col <- c("SEX_TYPE", "Index_year", "AGE", "Hypertension_event",
                       "PeripheralEnthe_event", "LipoidMetabDis_event",   
@@ -175,7 +180,7 @@ for(o in outcome_diseases){
   }
 }
 
-csv_file_name <- paste0(output_path, "model_summary.csv")
+csv_file_name <- paste0(output_path, "model_summary_clean.csv")
 fwrite(model_result, file = csv_file_name, row.names = FALSE)
 
 

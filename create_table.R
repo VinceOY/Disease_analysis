@@ -4,6 +4,8 @@ source("tool_function/tableone.R")
 library(data.table)
 library(stringr)
 library(ggplot2)
+library(openxlsx)
+
 #===============================================================================
 # set parameter
 parameters <- list(
@@ -18,7 +20,10 @@ parameters <- list(
                    HDL = list(ID = c("F09043A", "011301"), 
                               unit = c("(?i) mg/dl")),
                    LDL = list(ID = c("F09044A", "011401"), 
-                              unit = c("(?i) mg/dl"))),
+                              unit = c("(?i) mg/dl")),
+                   Creatinine = list(ID = c("F09015C","11D101","11A201", "010801","011C01"), 
+                                     unit = c("(?i) mg/dl"))),
+  
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro")
 )
@@ -73,7 +78,7 @@ season_i <- seq(0,365,90)
 interval <- 45
 
 # find disease lab + add interval_col
-#t <- names(Test_item)[6]
+#t <- names(Test_item)[5]
 for (t in names(Test_item)) {
   Test_ID <- Test_item[[t]]$ID
   unit_p <- Test_item[[t]]$unit
@@ -87,6 +92,27 @@ for (t in names(Test_item)) {
   dt_test <- dt_test[, outliers := ifelse(grepl("[><]", clean_value), 1, 0)]
 
   dt_test <- dt_test[, numeric_value := as.numeric(clean_value)]
+  
+  ####
+  
+  # drop outlier
+  quantiles <- quantile(dt_test[!is.na(numeric_value)]$numeric_value, 
+                        probs = c(0.01, 0.99))
+  q05 <- quantiles[1]
+  q95 <- quantiles[2]
+  dt_test <- dt_test[ numeric_value >= q05 & numeric_value  <= q95]
+  
+  # check density plot 
+  test <- dt_test[!is.na(numeric_value)]
+  p <- ggplot(test, aes(x = numeric_value, color = hospital)) +
+    geom_density() +
+    labs(x = "values", y = "Density", title = paste0(t, " Density Plot"))
+  print(p)
+  image_name <- paste0(output_path, t,"density_plot.png")
+  ggsave(image_name, plot = p, width = 6, height = 4, units = "in")
+  
+  ####
+  
   dt_test <- dt_test[, na_col := ifelse(is.na(numeric_value), 1, 0)]
   
   dt_outcome <- fread(paste0(input_path,"dt_exclude1.csv"))
@@ -95,24 +121,6 @@ for (t in names(Test_item)) {
 
   dt_test_T <- dt_test_T[, followup := as.numeric(Test_date-Index_date)]
   dt_test_T[, interval := create_intervals(dt_test_T$followup, season_i, interval)]
-  
-  ####
-  # drop outlier
-  #quantiles <- quantile(dt_test_T[!is.na(numeric_value)]$numeric_value, 
-  #                      probs = c(0.1, 0.9))
-  #q05 <- quantiles[1]
-  #q95 <- quantiles[2]
-  #dt_test_T <- dt_test_T[ numeric_value >= q05 & numeric_value  <= q95]
-  ####
-  
-  # check density plot 
-  test <- dt_test_T[!is.na(numeric_value)]
-  p <- ggplot(test, aes(x = numeric_value, color = hospital)) +
-    geom_density() +
-    labs(x = "values", y = "Density", title = paste0(t, " Density Plot"))
-  print(p)
-  image_name <- paste0(output_path, t,"density_plot.png")
-  ggsave(image_name, plot = p, width = 6, height = 4, units = "in")
   
   csv_file_name <- paste0(output_path,t,"_lab.csv")  
   fwrite(dt_test_T, file = csv_file_name, row.names = FALSE)
@@ -148,8 +156,8 @@ for (t in names(Test_item)) {
                     "median_value_3","median_value_4","n_0","n_1","n_2","n_3",
                     "n_4","total")
   tb2 <- create.table1(result_wide, need.col = tb2_need_col)
-  csv_file_name <- paste0(output_path, t, "_table2.csv")
-  fwrite(tb2, file = csv_file_name, row.names = FALSE)
+  xlsx_file_name <- paste0(output_path, t, "_table2.xlsx")
+  write.xlsx(tb2, xlsx_file_name, rowNames = FALSE)
 }
 
 #===============================================================================
@@ -193,16 +201,16 @@ for (t in names(Test_item)) {
     Total_people <- length(unique(dt$ID))
     need_col <- c("ID", paste0(o,"_event"), paste0(o,"_followup"))
     dt <- dt[,..need_col]
-    tb3_r <- data.table(outcome_test = paste0(o,"_",t), t(colSums(dt[,-1])), 
+    tb3_r <- data.table(test = t, outcome = o, t(colSums(dt[,-1])), 
                         N = Total_people)
-    setnames(tb3_r, c("outcome_test","# of event", "sum of follow up", "N"))
+    setnames(tb3_r, c("test", "outcome", "# of event", "sum of follow up", "N"))
     tb3 <- rbind(tb3, tb3_r)
   }
   tb3_T <- rbind(tb3_T,tb3)
 }
+tb3_T[ , `sum of follow up` := `sum of follow up` / 365]
 
-tb3_T[, ("IR%") := round(get("# of event") / (get("sum of follow up")/365)*100, 
-                         3)]
+tb3_T[, ("IR%") := round(get("# of event") / (get("sum of follow up"))*100,3)]
 
 csv_file_name <- paste0(output_path, "table3_all_outcome_summary.csv")
 fwrite(tb3_T, file = csv_file_name, row.names = FALSE)
