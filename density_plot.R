@@ -58,13 +58,13 @@ for (t in names(Test_item)) {
   dt_test <- dt_test[, na_col := ifelse(is.na(numeric_value), 1, 0)]
 
   # select diabete
-  dt_outcome <- fread(paste0(input_path,"dt_exclude1.csv"))
-  dt_test_T <- merge(dt_outcome, dt_test, by = "ID", all.x = TRUE) # 得糖尿病沒檢驗的人
-  dt_test_T <- dt_test_T[, exclude_testdate_na := ifelse(is.na(Test_date), 1, 0)]
-  dt_test_T <- dt_test_T[, followup := as.numeric(Test_date-Index_date)]
+  #dt_outcome <- fread(paste0(input_path,"dt_exclude1.csv"))
+  #dt_test_T <- merge(dt_outcome, dt_test, by = "ID", all.x = TRUE) # 得糖尿病沒檢驗的人
+  #dt_test_T <- dt_test_T[, exclude_testdate_na := ifelse(is.na(Test_date), 1, 0)]
+  #dt_test_T <- dt_test_T[, followup := as.numeric(Test_date-Index_date)]
 
   #check quantile and density plot
-  test <- dt_test_T[!is.na(numeric_value)]
+  test <- dt_test[!is.na(numeric_value)]
   
   quantiles <- quantile(test$numeric_value, probs = c(0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99))
   q1 <- quantiles["25%"]
@@ -85,12 +85,12 @@ for (t in names(Test_item)) {
   test[, numeric_value := ifelse(numeric_value > upper, upper, numeric_value)]
   p <- ggplot(test, aes(x = numeric_value, color = hospital)) +
     geom_density() +
-    labs(x = "values", y = "Density", title = paste0(t, " Density Plot all lab values"))
+    labs(x = "values", y = "Density", title = paste0(t, " Density Plot"))
   print(p)
   image_name <- paste0(output_path, t,"density_plot_all.png")
   ggsave(image_name, plot = p, width = 6, height = 4, units = "in")
 } 
 
-csv_file_name <- paste0(output_path, "test_value_density_diabete.csv")
+csv_file_name <- paste0(output_path, "test_value_density_all.csv")
 fwrite(dt_dist, file = csv_file_name, row.names = FALSE)
 

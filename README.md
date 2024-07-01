@@ -18,6 +18,8 @@ Disease_analysis/
 ├── lab_result.R
 ├── create_table.R
 ├── cox_model.R
+├── find_test_item_code.R
+├── density_plot.R
 └── README.md
 ```
 
@@ -63,15 +65,25 @@ Disease_analysis/
         - cutpoint2: test_valid_id.csv (定期做檢驗的病人ID) *2
         - output: test_item_table2.csv *2
         
-    - table3: exclude2下4季皆有追蹤的患者: 各outcome (event、總數量、總追蹤時間) todo: 加一欄算盛行率
+    - table3: exclude2下4季皆有追蹤的患者: 各outcome (event、總數量、總追蹤時間) 
         - input: test_item_valid_id、dt_exclude2
         - cutpoint: test_outcome_dtf.csv * 12 
         - output: table3_all_outcome_summary.csv *1
 
 - cox_model_result.R: 
-  - 目的: 從6 outcomes, 2 test items, 4 variable selections, 整理48個cox model的result
+  - 目的: 從6 outcomes, 6 test items, 4 variable selections, 整理48個cox model的result
     - input_table: test_outcome_dtf.csv
     - output_table: 
       -  test_outcome_dtf_all.csv
       -  model_summary.csv
+
+- find_test_item_code.R
+  - 目的: 找出相對應的Test item code and Test item name
+    - input_table: v_exp_item_t.csv, v_exp_item_s.csv
+    - 連回create_table.csv
+    
+- density_plot.R
+  - 目的: 劃出三院各檢測項目的分佈圖(同時要壓縮離群值), 同時輸出各檢驗結果的分佈值
+    - input_table: lab_result_swt.csv
+    - output: test_item_density_plot_all.png, test_value_density_diabete.csv
       

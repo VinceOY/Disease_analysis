@@ -1,0 +1,52 @@
+<mxfile host="app.diagrams.net" modified="2024-07-01T01:48:39.880Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36" etag="waL2uaGRnppjrkVtVX9C" version="24.6.4" type="device">
+  <diagram name="第 1 页" id="AluRszcNCi-zeq1M-AA3">
+    <mxGraphModel dx="2788" dy="1860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="QT5JzcLpO9JpO9J6h1oz-1" value="&lt;div style=&quot;&quot;&gt;&lt;div style=&quot;&quot;&gt;萬芳檢測資料&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="-1480" y="-880" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="QT5JzcLpO9JpO9J6h1oz-2" value="&lt;div style=&quot;&quot;&gt;&lt;div style=&quot;&quot;&gt;雙和、北醫檢測資料&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="-1240" y="-880" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="QT5JzcLpO9JpO9J6h1oz-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-1420" y="-800" as="sourcePoint" />
+            <mxPoint x="-1300" y="-720" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="-1420" y="-800" />
+              <mxPoint x="-1420" y="-760" />
+              <mxPoint x="-1300" y="-760" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="QT5JzcLpO9JpO9J6h1oz-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="QT5JzcLpO9JpO9J6h1oz-2">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-1180" y="-770" as="sourcePoint" />
+            <mxPoint x="-1300" y="-720" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="-1180" y="-760" />
+              <mxPoint x="-1300" y="-760" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="QT5JzcLpO9JpO9J6h1oz-9" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=12;startSize=8;endSize=8;" edge="1" parent="1" source="QT5JzcLpO9JpO9J6h1oz-7" target="QT5JzcLpO9JpO9J6h1oz-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="QT5JzcLpO9JpO9J6h1oz-7" value="&lt;div style=&quot;&quot;&gt;&lt;div style=&quot;&quot;&gt;三院檢測項目&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="-1360" y="-720" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="QT5JzcLpO9JpO9J6h1oz-11" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=12;startSize=8;endSize=8;" edge="1" parent="1" source="QT5JzcLpO9JpO9J6h1oz-8" target="QT5JzcLpO9JpO9J6h1oz-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="QT5JzcLpO9JpO9J6h1oz-8" value="&lt;div style=&quot;&quot;&gt;&lt;div style=&quot;&quot;&gt;exclude:&amp;nbsp;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;1. outlier&amp;nbsp;&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="-1360" y="-600" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="QT5JzcLpO9JpO9J6h1oz-10" value="&lt;div style=&quot;&quot;&gt;&lt;div style=&quot;&quot;&gt;三院清整完畢的lab檔&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="-1360" y="-480" width="120" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
