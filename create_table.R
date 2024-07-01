@@ -21,7 +21,7 @@ parameters <- list(
                               unit = c("(?i) mg/dl")),
                    LDL = list(ID = c("F09044A", "011401"), 
                               unit = c("(?i) mg/dl")),
-                   Creatinine = list(ID = c("F09015C","11D101","11A201", "010801","011C01"), 
+                   Creatinine = list(ID = c("11D101","11A201", "010801","011C01"), 
                                      unit = c("(?i) mg/dl"))),
   
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 

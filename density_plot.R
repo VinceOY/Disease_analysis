@@ -66,7 +66,8 @@ for (t in names(Test_item)) {
   #check quantile and density plot
   test <- dt_test[!is.na(numeric_value)]
   
-  quantiles <- quantile(test$numeric_value, probs = c(0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99))
+  quantiles <- quantile(test$numeric_value, probs = c(0.01, 0.05, 0.25, 0.5, 
+                                                      0.75, 0.95, 0.99))
   q1 <- quantiles["25%"]
   median <- quantiles["50%"]
   q3 <- quantiles["75%"]

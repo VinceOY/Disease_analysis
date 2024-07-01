@@ -34,9 +34,14 @@ d_item <- d_item[,c("O_ITEM", "R_ITEM","R_ITEM_NAME"), with = FALSE]
 dt_selected <- d_item[grep("Glucose", R_ITEM_NAME, ignore.case = TRUE)]
 selected_ID <- unique(dt_selected[["R_ITEM"]])
 
+dt_lab[Test_item == "07Z105"]
 
+number_test <- data.table()
 for (i in selected_ID) {
   dt_tmp <- dt_lab[Test_item == i]
+  number_test <- rbind(number_test, data.table(R_ITEM = i, count = nrow(dt_tmp)))
   cat(i, nrow(dt_tmp),"\n")
 }
 
+dt_test_count <- merge(dt_selected, number_test, by = "R_ITEM", all.x=T) 
+dt_test_count[order(-count)]

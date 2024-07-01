@@ -54,7 +54,7 @@ Disease_analysis/
 
 - create_table.R:  output * 20 
   - 目的: 輸出資料表、以及最後要放入模型分析的病患檔案
-    - table1: dt_exclude1下基本資料欄位分布, table1_basic.csv *1
+    - table1: dt_exclude1下基本資料欄位分布, table1_basic.csv*1
     - table2: 有效患者各季test item的檢驗值、次數
       - step1:# find disease lab + add interval_col
         - input: 3院lab檔、dt_exclude1
@@ -67,7 +67,7 @@ Disease_analysis/
         
     - table3: exclude2下4季皆有追蹤的患者: 各outcome (event、總數量、總追蹤時間) 
         - input: test_item_valid_id、dt_exclude2
-        - cutpoint: test_outcome_dtf.csv * 12 
+        - cutpoint: test_outcome_dtf.csv * 12
         - output: table3_all_outcome_summary.csv *1
 
 - cox_model_result.R: 
