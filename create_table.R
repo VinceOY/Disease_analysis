@@ -15,15 +15,15 @@ parameters <- list(
                                 unit = c("%")),
                    ALBUMIN = list(ID = c("010301","11D101","F09038C"), 
                                   unit = c("(?i) g/dl")),
-                   Uric  = list(ID = c("011001","F09013C"), 
+                   Uric  = list(ID = c("011001","11D801","F09013C"),
+                                       #,"F09013C","01A300","01A301"), 
                                 unit = c("(?i) mg/dl")),
                    HDL = list(ID = c("F09043A", "011301"), 
                               unit = c("(?i) mg/dl")),
                    LDL = list(ID = c("F09044A", "011401"), 
                               unit = c("(?i) mg/dl")),
-                   Creatinine = list(ID = c("11D101","11A201", "010801","011C01"), 
+                   Creatinine = list(ID = c("11A201", "010801"), 
                                      unit = c("(?i) mg/dl"))),
-  
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro")
 )
@@ -93,25 +93,12 @@ for (t in names(Test_item)) {
 
   dt_test <- dt_test[, numeric_value := as.numeric(clean_value)]
   
-  ####
-  
-  # drop outlier
+  ### drop outlier
   quantiles <- quantile(dt_test[!is.na(numeric_value)]$numeric_value, 
                         probs = c(0.01, 0.99))
   q05 <- quantiles[1]
   q95 <- quantiles[2]
   dt_test <- dt_test[ numeric_value >= q05 & numeric_value  <= q95]
-  
-  # check density plot 
-  test <- dt_test[!is.na(numeric_value)]
-  p <- ggplot(test, aes(x = numeric_value, color = hospital)) +
-    geom_density() +
-    labs(x = "values", y = "Density", title = paste0(t, " Density Plot"))
-  print(p)
-  image_name <- paste0(output_path, t,"density_plot.png")
-  ggsave(image_name, plot = p, width = 6, height = 4, units = "in")
-  
-  ####
   
   dt_test <- dt_test[, na_col := ifelse(is.na(numeric_value), 1, 0)]
   

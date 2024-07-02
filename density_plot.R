@@ -2,7 +2,7 @@ rm(list=ls());gc()
 library(data.table)
 library(stringr)
 library(ggplot2)
-
+library(openxlsx)
 #===============================================================================
 # set parameter
 parameters <- list(
@@ -14,7 +14,7 @@ parameters <- list(
                    ALBUMIN = list(ID = c("010301","11D101","F09038C"), 
                                   unit = c("(?i) g/dl"),
                                   upper = 30),
-                   Uric  = list(ID = c("011001","F09013C"), 
+                   Uric  = list(ID = c("011001","11D801","F09013C"), 
                                 unit = c("(?i) mg/dl"),
                                 upper = 20),
                    HDL = list(ID = c("F09043A", "011301"), 
@@ -23,7 +23,7 @@ parameters <- list(
                    LDL = list(ID = c("F09044A", "011401"), 
                               unit = c("(?i) mg/dl"),
                               upper = 200),
-                   Creatinine = list(ID = c("F09015C","11D101","11A201", "010801","011C01"), 
+                   Creatinine = list(ID = c("F09015C","11A201", "010801"), 
                                      unit = c("(?i) mg/dl"),
                                      upper = 10)),
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
@@ -88,10 +88,11 @@ for (t in names(Test_item)) {
     geom_density() +
     labs(x = "values", y = "Density", title = paste0(t, " Density Plot"))
   print(p)
-  image_name <- paste0(output_path, t,"density_plot_all.png")
+  image_name <- paste0(output_path, t,"density_plot_ori.png")
   ggsave(image_name, plot = p, width = 6, height = 4, units = "in")
 } 
 
-csv_file_name <- paste0(output_path, "test_value_density_all.csv")
-fwrite(dt_dist, file = csv_file_name, row.names = FALSE)
+xlsx_file_name <- paste0(output_path, "test_value_density_all.xlsx")
+write.xlsx(dt_dist, xlsx_file_name, rowNames = FALSE)
+
 

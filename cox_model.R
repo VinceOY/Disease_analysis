@@ -33,8 +33,8 @@ w.sd <- function(x, w) {
   sqrt(variance)
 }
 
-#t <- Test_item[3]
-#o <- outcome_diseases[6]
+t <- Test_item[3]
+o <- outcome_diseases[6]
 for (t in Test_item) {
   for (o in outcome_diseases) {
     d_tmp <- fread(paste0(input_path,t,"_",o,"_dtf.csv"))
@@ -42,9 +42,17 @@ for (t in Test_item) {
                     "interval")
     dt_v <- d_tmp[,..select_col]
     dt_v <- dt_v[!is.na(interval)] 
-
-    dt_v <- dt_v[, .(
+    
+    dt_v[,weight := sum(.N), by = .(ID, interval)]
+    dt_v[ID==unique(dt_v$ID)[1]]
+    
+    # 季內by月份去算, 年分by季去算????
+    dt_v<- dt_v[, .(
       mean_value = mean(numeric_value, na.rm = TRUE)), by = .(ID, interval)]
+    
+    # weight mean
+    #b <- a[, .(
+    #  mean_value = sum(mean_value * .N) / sum(.N)), by = .(ID, interval)]
     
     dt_v <- dcast(dt_v, ID ~ interval, value.var = c("mean_value"))
     interval_cols <- paste0("mean",0:(length(unique(d_tmp$interval))-2))
@@ -55,7 +63,11 @@ for (t in Test_item) {
          .SDcols = interval_cols]
     dt_v[, rms_value := apply(.SD, 1, function(x) sqrt(mean(x^2, na.rm = TRUE))), 
          .SDcols = interval_cols]
-
+    
+    # add control mean
+    #dt_v[, control_mean := apply(.SD, 1, mean, na.rm = TRUE),
+    #     .SDcols = interval_cols[-1]]
+    
     select_col2 <- c("ID", "SEX_TYPE", "Index_year", "AGE","AGE_GROUP", 
                 "Hypertension_event","PeripheralEnthe_event", 
                 "UnknownCauses_event", "LipoidMetabDis_event",
@@ -121,8 +133,8 @@ for(o in outcome_diseases){
                       "ContactDermEczema_event", "ViralInfection_event",
                       "ObesityHyperal_event", "AcuteBronchitis_event",  
                       "SoftTissueDis_event", "BloodExamFindings_event", 
-                      "ConjunctivaDis_event", "mean0" ,paste0(o, "_event"), 
-                      paste0(o, "_followup"))
+                      "ConjunctivaDis_event" ,paste0(o, "_event"), 
+                      paste0(o, "_followup"), "mean0")
       
       select_col <- c(select_col, inputs[[i]])
       dt_input <- dt[,..select_col]
