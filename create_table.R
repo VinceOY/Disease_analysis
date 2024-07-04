@@ -74,8 +74,13 @@ create_intervals <- function(values, season_i, interval) {
 
 file_name <- paste0(input_path,"lab_result_swt.csv")
 dt_lab <- fread(file_name)
-season_i <- seq(0,365,90)
-interval <- 45
+
+# parameters
+season_i <- seq(0,730,180)
+interval <- 90
+q_lower <- 0.01
+q_upper <- 0.99
+
 
 # find disease lab + add interval_col
 #t <- names(Test_item)[5]
@@ -95,7 +100,7 @@ for (t in names(Test_item)) {
   
   ### drop outlier
   quantiles <- quantile(dt_test[!is.na(numeric_value)]$numeric_value, 
-                        probs = c(0.01, 0.99))
+                        probs = c(q_lower, q_upper))
   q05 <- quantiles[1]
   q95 <- quantiles[2]
   dt_test <- dt_test[ numeric_value >= q05 & numeric_value  <= q95]
@@ -184,7 +189,7 @@ for (t in names(Test_item)) {
     csv_file_name <- paste0(output_path, t,"_", o,"_dtf.csv") 
     fwrite(clean_df, file = csv_file_name, row.names = FALSE)
     
-    #table3
+    # table3
     Total_people <- length(unique(dt$ID))
     need_col <- c("ID", paste0(o,"_event"), paste0(o,"_followup"))
     dt <- dt[,..need_col]

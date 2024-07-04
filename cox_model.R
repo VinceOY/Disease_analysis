@@ -41,12 +41,12 @@ for (t in Test_item) {
     select_col <- c("ID", "Index_date", "Test_date", "numeric_value", "unit",
                     "interval")
     dt_v <- d_tmp[,..select_col]
-    dt_v <- dt_v[!is.na(interval)] 
+    dt_v <- dt_v[!is.na(interval)]
     
     dt_v[,weight := sum(.N), by = .(ID, interval)]
     dt_v[ID==unique(dt_v$ID)[1]]
     
-    # 季內by月份去算, 年分by季去算????
+    # 確認要算什麼: 季內by月份去算, 年分by季去算????
     dt_v<- dt_v[, .(
       mean_value = mean(numeric_value, na.rm = TRUE)), by = .(ID, interval)]
     

@@ -83,7 +83,7 @@ Disease_analysis/
     - 連回create_table.csv
     
 - density_plot.R
-  - 目的: 劃出三院各檢測項目的分佈圖(同時要壓縮離群值), 同時輸出各檢驗結果的分佈值
+  - 目的: 畫出三院各檢測項目的分佈圖(同時要壓縮離群值), 同時輸出各檢驗結果的分佈值
     - input_table: lab_result_swt.csv
     - output: test_item_density_plot_all.png, test_value_density_diabete.csv
       
