@@ -10,8 +10,7 @@ library(survival)
 parameters <- list(
   input_path = "C:/Users/USER/Downloads/proj_data/step4/",
   output_path = "C:/Users/USER/Downloads/proj_data/step5/",
-  #Test_item = c("HbA1c", "ALBUMIN", "Uric", "HDL","LDL"),
-  Test_item = c("HbA1c", "ALBUMIN", "Uric","Creatinine", "HDL","LDL"),
+  Test_item = c("HbA1c", "ALBUMIN", "Uric", "HDL","LDL","Creatinine","Triglyceride"),
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
                        "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro")
 )
@@ -24,35 +23,34 @@ outcome_diseases <- parameters$outcome_diseases
 # need to know n(m): 每一個ID每一個月份的test data數量 n是筆數, m是月份
 # 撈出id, interval, month 
 
-w.sd <- function(x, w) {
-  if (length(x) != length(w)) stop("x and w must be the same length")
-  if (all(is.na(x))) return(NA)
-  
-  avg <- weighted.mean(x, w, na.rm = TRUE)
-  variance <- sum(w * (x - avg)^2, na.rm = TRUE) / sum(w, na.rm = TRUE)
-  sqrt(variance)
+# 定義 VIM 計算函數
+calculate_vim <- function(x, lambda = 1) {
+  sd_value <- sd(x, na.rm = TRUE)
+  mean_value <- mean(x, na.rm = TRUE)
+  vim <- sd_value / (mean_value^lambda)
+  return(vim)
 }
 
-t <- Test_item[3]
-o <- outcome_diseases[6]
+adj_sd <- function(x) {
+  n <- length(x[!is.na(x)])
+  adj_sd <- sd(x, na.rm = TRUE) * sqrt((n - 1) / n)
+  return(adj_sd)
+}
+
+# t <- Test_item[3]
+# o <- outcome_diseases[6]
 for (t in Test_item) {
   for (o in outcome_diseases) {
     d_tmp <- fread(paste0(input_path,t,"_",o,"_dtf.csv"))
+    
+    
     select_col <- c("ID", "Index_date", "Test_date", "numeric_value", "unit",
                     "interval")
     dt_v <- d_tmp[,..select_col]
     dt_v <- dt_v[!is.na(interval)]
     
-    dt_v[,weight := sum(.N), by = .(ID, interval)]
-    dt_v[ID==unique(dt_v$ID)[1]]
-    
-    # 確認要算什麼: 季內by月份去算, 年分by季去算????
-    dt_v<- dt_v[, .(
+    dt_v <- dt_v[, .(
       mean_value = mean(numeric_value, na.rm = TRUE)), by = .(ID, interval)]
-    
-    # weight mean
-    #b <- a[, .(
-    #  mean_value = sum(mean_value * .N) / sum(.N)), by = .(ID, interval)]
     
     dt_v <- dcast(dt_v, ID ~ interval, value.var = c("mean_value"))
     interval_cols <- paste0("mean",0:(length(unique(d_tmp$interval))-2))
@@ -64,22 +62,43 @@ for (t in Test_item) {
     dt_v[, rms_value := apply(.SD, 1, function(x) sqrt(mean(x^2, na.rm = TRUE))), 
          .SDcols = interval_cols]
     
-    # add control mean
-    #dt_v[, control_mean := apply(.SD, 1, mean, na.rm = TRUE),
-    #     .SDcols = interval_cols[-1]]
+    # vim
+    dt_v[, vim_value := apply(.SD, 1, calculate_vim, lambda = 0.3),
+         .SDcols = interval_cols]
+    
+    # adj_sd
+    dt_v[, adj_sd := apply(.SD, 1, adj_sd), .SDcols = interval_cols]
+    
+    # d_tmps beta
+    beta_list <- list()
+    for (i in unique(d_tmp$ID)) {
+      
+      dp <- d_tmp[ID==i]
+      dp <- dp[!is.na(interval)]
+      model <- lm(numeric_value ~ followup, data = dp)
+      dp[,.(followup,numeric_value)]
+      
+      beta_list[[i]] <- coef(model)[["followup"]]
+    }
+    
+    # unlist cor_ID to dt
+    beta_df <- data.table(ID = names(beta_list), beta = unlist(beta_list))
+    
+    # merge to original dt
+    d_tmp <- merge(d_tmp, beta_df, by = "ID", all.x = TRUE)
     
     select_col2 <- c("ID", "SEX_TYPE", "Index_year", "AGE","AGE_GROUP", 
-                "Hypertension_event","PeripheralEnthe_event", 
-                "UnknownCauses_event", "LipoidMetabDis_event",
-                "AcuteURI_event", "AbdPelvicSymptoms_event", 
-                "Dermatophytosis_event","GenSymptoms_event", 
-                "RespChestSymptoms_event", "HeadNeckSymptoms_event", 
-                "ContactDermEczema_event", "ViralInfection_event", 
-                "ObesityHyperal_event","JointDisorders_event", 
-                "AcuteBronchitis_event", "SoftTissueDis_event",
-                "BloodExamFindings_event", "RefractionDis_event", 
-                "ConjunctivaDis_event", paste0(o, "_event"), 
-                paste0(o, "_followup"))
+                     "Hypertension_event","PeripheralEnthe_event", 
+                     "UnknownCauses_event", "LipoidMetabDis_event",
+                     "AcuteURI_event", "AbdPelvicSymptoms_event", 
+                     "Dermatophytosis_event","GenSymptoms_event", 
+                     "RespChestSymptoms_event", "HeadNeckSymptoms_event", 
+                     "ContactDermEczema_event", "ViralInfection_event", 
+                     "ObesityHyperal_event","JointDisorders_event", 
+                     "AcuteBronchitis_event", "SoftTissueDis_event",
+                     "BloodExamFindings_event", "RefractionDis_event", 
+                     "ConjunctivaDis_event", paste0(o, "_event"), 
+                     paste0(o, "_followup"),"beta")
     
     d_tmp[,Index_year:= year(Index_date)] 
     d_tmp <- d_tmp[,..select_col2]
@@ -95,9 +114,11 @@ for (t in Test_item) {
 #===============================================================================
 # build model table: 
 inputs <- list(option1 = c(),
-               option2 = c("sd_value"),
-               option3 = c("cv_value"),
-               option4 = c("rms_value"))
+               option2 = c("mean0","sd_value"),
+               option3 = c("mean0","cv_value"),
+               option4 = c("mean0","rms_value"),
+               option5 = c("mean0","vim_value"),
+               option6 = c("mean0","adj_sd"))
 model_result <- data.table()
 m <- 1
 
@@ -111,7 +132,7 @@ for(o in outcome_diseases){
     #dt <- dt[, mean_fact :=  ifelse(mean0  < 3.4 | mean0  > 6, 
     #                                ifelse(mean0  < 3.4, 1, 2), 0)]
      
-    category_col <- c("SEX_TYPE", "Index_year", "AGE_GROUP", "Hypertension_event",      
+    category_col <- c("SEX_TYPE", "Index_year", "AGE", "Hypertension_event",      
                       "PeripheralEnthe_event", "UnknownCauses_event", 
                       "LipoidMetabDis_event", "AcuteURI_event", 
                       "AbdPelvicSymptoms_event", "Dermatophytosis_event", 
@@ -123,7 +144,11 @@ for(o in outcome_diseases){
                       "RefractionDis_event", "ConjunctivaDis_event")
     
     dt[, (category_col) := lapply(.SD, as.factor), .SDcols = category_col]
-    # modify mean0
+    dt$AGE <- as.integer(dt$AGE)
+    
+    # test exclude beta, CV
+    dt <- dt[abs(beta) < quantile(dt$beta,0.9)]
+
     for(i in names(inputs)){
       select_col <- c("SEX_TYPE", "Index_year", "AGE", "Hypertension_event",
                       "PeripheralEnthe_event", "LipoidMetabDis_event",   
@@ -133,12 +158,12 @@ for(o in outcome_diseases){
                       "ContactDermEczema_event", "ViralInfection_event",
                       "ObesityHyperal_event", "AcuteBronchitis_event",  
                       "SoftTissueDis_event", "BloodExamFindings_event", 
-                      "ConjunctivaDis_event" ,paste0(o, "_event"), 
-                      paste0(o, "_followup"), "mean0")
+                      "ConjunctivaDis_event" , paste0(o, "_event"), 
+                      paste0(o, "_followup"))
       
       select_col <- c(select_col, inputs[[i]])
       dt_input <- dt[,..select_col]
-
+      
       # 刪除只有一種類別的欄位
       factor_columns <- sapply(dt_input, is.factor)
       check_level_factors <- sapply(dt_input[,..factor_columns], 

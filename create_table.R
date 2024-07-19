@@ -8,34 +8,43 @@ library(openxlsx)
 
 #===============================================================================
 # set parameter
+f_up <- 90
+i <- 45
 parameters <- list(
   input_path = "C:/Users/USER/Downloads/proj_data/step3/",
   output_path = "C:/Users/USER/Downloads/proj_data/step4/",
-  Test_item = list(HbA1c = list(ID = c("014701","F09006B"), 
-                                unit = c("%")),
+  Test_item = list(HbA1c = list(ID = c("014701","F09006B"), unit = c("%"),
+                                follow_up = f_up, interval = i),
                    ALBUMIN = list(ID = c("010301","11D101","F09038C"), 
-                                  unit = c("(?i) g/dl")),
-                   Uric  = list(ID = c("011001","11D801","F09013C"),
-                                       #,"F09013C","01A300","01A301"), 
-                                unit = c("(?i) mg/dl")),
+                                  unit = c("(?i) g/dl"), 
+                                  follow_up = f_up, interval = i),
+                   Uric  = list(ID = c("011001","11D801","F09013C"), 
+                                unit = c("(?i) mg/dl"),  
+                                follow_up = f_up, interval = i),
                    HDL = list(ID = c("F09043A", "011301"), 
-                              unit = c("(?i) mg/dl")),
+                              unit = c("(?i) mg/dl"), 
+                              follow_up = f_up, interval = i),
                    LDL = list(ID = c("F09044A", "011401"), 
-                              unit = c("(?i) mg/dl")),
+                              unit = c("(?i) mg/dl"),
+                              follow_up = f_up, interval = i),
                    Creatinine = list(ID = c("11A201", "010801"), 
-                                     unit = c("(?i) mg/dl"))),
+                                     unit = c("(?i) mg/dl"),
+                                     follow_up = f_up, interval = i),
+                   Triglyceride = list(ID = c("011201", "F09004C"), 
+                                     unit = c("(?i) mg/dl"), 
+                                     follow_up = f_up, interval = i)),
   outcome_diseases = c("EyeComp", "CardioDisease", "CerebroDisease", 
-                       "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro")
+                       "PeripheralVascDisease", "Nephropathy", "DiabeticNeuro"),
+  total_follow_year = 365,
+  outlier = c(0.01,0.99)
 )
 input_path <- parameters$input_path
 output_path <- parameters$output_path
 Test_item <- parameters$Test_item
 outcome_diseases <- parameters$outcome_diseases
-
-#Uric  = list(ID = c("F09013C","011001"), 
-#             unit = c("(?i) mg/dl")),
-#Creatinine = list(ID = c("F09015C","11D101","11A201", "010801","011C01"), 
-#                  unit = c("(?i) mg/dl")),
+q_lower <- parameters$outlier[1]
+q_upper <- parameters$outlier[2]
+total_follow_year <- parameters$total_follow_year
 
 #===============================================================================
 # create table1
@@ -72,21 +81,17 @@ create_intervals <- function(values, season_i, interval) {
   return(intervals)
 }
 
+# parameters
 file_name <- paste0(input_path,"lab_result_swt.csv")
 dt_lab <- fread(file_name)
-
-# parameters
-season_i <- seq(0,730,180)
-interval <- 90
-q_lower <- 0.01
-q_upper <- 0.99
-
 
 # find disease lab + add interval_col
 #t <- names(Test_item)[5]
 for (t in names(Test_item)) {
   Test_ID <- Test_item[[t]]$ID
   unit_p <- Test_item[[t]]$unit
+  season_i <- seq(0, total_follow_year, Test_item[[t]]$follow_up)
+  interval <- Test_item[[t]]$interval
   
   # select test_item
   dt_test <- dt_lab[grepl(paste0("^", paste(Test_ID, collapse="|^")), 
@@ -143,10 +148,12 @@ for (t in names(Test_item)) {
                                      "n"))
   result_wide[, total := rowSums((.SD),na.rm = TRUE), 
               .SDcols = paste0("n_", 0:(length(season_i)-1))]
+  
+  med_col <- paste0("median_value_", 0:(length(season_i)-1))
+  n_col <- paste0("n_", 0:(length(season_i)-1))
+
   # table2
-  tb2_need_col <- c("median_value_0","median_value_1","median_value_2",
-                    "median_value_3","median_value_4","n_0","n_1","n_2","n_3",
-                    "n_4","total")
+  tb2_need_col <- c(med_col,n_col,"total")
   tb2 <- create.table1(result_wide, need.col = tb2_need_col)
   xlsx_file_name <- paste0(output_path, t, "_table2.xlsx")
   write.xlsx(tb2, xlsx_file_name, rowNames = FALSE)
